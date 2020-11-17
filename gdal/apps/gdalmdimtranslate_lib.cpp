@@ -643,20 +643,18 @@ static bool ParseArraySpec(const std::string& arraySpec,
         if( !bInArray && arraySpec[i] == ',' )
         {
             tokens.emplace_back(std::move(curToken));
-            curToken.clear();
-        }
-        else if( arraySpec[i] == '[' )
-        {
-            bInArray = true;
-            curToken += arraySpec[i];
-        }
-        else if( arraySpec[i] == ']' )
-        {
-            bInArray = false;
-            curToken += arraySpec[i];
+            curToken = std::string();
         }
         else
         {
+            if( arraySpec[i] == '[' )
+            {
+                bInArray = true;
+            }
+            else if( arraySpec[i] == ']' )
+            {
+                bInArray = false;
+            }
             curToken += arraySpec[i];
         }
     }
@@ -1620,7 +1618,7 @@ static GDALDatasetH CopyToNonMultiDimensionalDriver(
 /**
  * Converts raster data between different formats.
  *
- * This is the equivalent of the gdalmdimtranslate utility.
+ * This is the equivalent of the <a href="/programs/gdalmdimtranslate.html">gdalmdimtranslate</a> utility.
  *
  * GDALMultiDimTranslateOptions* must be allocated and freed with GDALMultiDimTranslateOptionsNew()
  * and GDALMultiDimTranslateOptionsFree() respectively.
@@ -1631,7 +1629,7 @@ static GDALDatasetH CopyToNonMultiDimensionalDriver(
  * @param nSrcCount the number of input datasets.
  * @param pahSrcDS the list of input datasets.
  * @param psOptions the options struct returned by GDALMultiDimTranslateOptionsNew() or NULL.
- * @param pbUsageError the pointer to int variable to determine any usage error has occurred or NULL.
+ * @param pbUsageError pointer to a integer output variable to store if any usage error has occurred or NULL.
  * @return the output dataset (new dataset that must be closed using GDALClose(), or hDstDS is not NULL) or NULL in case of error.
  *
  * @since GDAL 3.1
@@ -1786,7 +1784,7 @@ GDALDatasetH GDALMultiDimTranslate( const char* pszDest,
  * Allocates a GDALMultiDimTranslateOptions struct.
  *
  * @param papszArgv NULL terminated list of options (potentially including filename and open options too), or NULL.
- *                  The accepted options are the ones of the gdalmdimtranslate utility.
+ *                  The accepted options are the ones of the <a href="/programs/gdalmdimtranslate.html">gdalmdimtranslate</a> utility.
  * @param psOptionsForBinary (output) may be NULL (and should generally be NULL),
  *                           otherwise (gdalmultidimtranslate_bin.cpp use case) must be allocated with
  *                           GDALTranslateOptionsForBinaryNew() prior to this function. Will be

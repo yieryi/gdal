@@ -791,6 +791,32 @@ cellsize     0
     data = struct.unpack('B' * 1, data)
     assert data[0] == 50
 
+
+###############################################################################
+# Test average downsampling by a non-integer factor
+
+
+def test_rasterio_average_4by4_to_3by3():
+
+    gdal.FileFromMemBuffer('/vsimem/test_rasterio_average_4by4_to_3by3.asc',
+                           """ncols        4
+nrows        4
+xllcorner    0
+yllcorner    0
+cellsize     1
+ 1.0 5 9 13
+ 2 6 10 14
+ 3 7 11 15
+ 4 8 12 16""")
+
+    ds = gdal.Translate('', '/vsimem/test_rasterio_average_4by4_to_3by3.asc', options='-ot Float32 -f MEM -r average -outsize 3 3')
+    data = ds.GetRasterBand(1).ReadRaster()
+    assert struct.unpack('f' * 9, data) == (2.25, 7.25, 12.25,
+                                            3.5, 8.5, 13.5,
+                                            4.75, 9.75, 14.75)
+
+    gdal.Unlink('/vsimem/test_rasterio_average_4by4_to_3by3.asc')
+
 ###############################################################################
 # Test average oversampling by an integer factor (should behave like nearest)
 
@@ -845,6 +871,31 @@ cellsize     0
 
 ###############################################################################
 
+def test_rasterio_nodata():
+
+	try:
+		from osgeo import gdalnumeric
+		gdalnumeric.zeros
+	except (ImportError, AttributeError):
+		pytest.skip()
+
+	ndv = 123
+	btype = [ gdal.GDT_Byte, gdal.GDT_Int16, gdal.GDT_Int32, gdal.GDT_Float32, gdal.GDT_Float64 ]
+
+	### create a MEM dataset
+	for src_type in btype:
+		mem_ds = gdal.GetDriverByName('MEM').Create('', 10, 9, 1, src_type)
+		mem_ds.GetRasterBand(1).SetNoDataValue(ndv)
+		mem_ds.GetRasterBand(1).Fill(ndv)
+
+		for dst_type in btype:
+			if ( dst_type > src_type ):
+				### read to a buffer of a wider type (and resample)
+				data = mem_ds.GetRasterBand(1).ReadAsArray(0, 0, 10, 9, 4, 3, resample_alg=gdal.GRIORA_Bilinear, buf_type=dst_type)
+				assert int(data[0,0]) == ndv, 'did not read expected band data via ReadAsArray() - src type -> dst type: ' + str( src_type ) + ' -> ' + str( dst_type )
+
+
+###############################################################################
 
 def test_rasterio_lanczos_nodata():
 
@@ -967,3 +1018,54 @@ def test_rasterio_dataset_write_on_readonly():
     with gdaltest.error_handler():
         err = ds.WriteRaster(0, 0, 20, 20, ds.ReadRaster())
     assert err != 0
+
+
+@pytest.mark.parametrize('resample_alg', [-1, 8])
+def test_rasterio_dataset_invalid_resample_alg(resample_alg):
+
+    mem_ds = gdal.GetDriverByName('MEM').Create('', 2, 2)
+    with gdaltest.error_handler():
+        with pytest.raises(Exception):
+            assert mem_ds.ReadRaster(buf_xsize=1, buf_ysize=1, resample_alg=resample_alg) is None
+        with pytest.raises(Exception):
+            assert mem_ds.GetRasterBand(1).ReadRaster(buf_xsize=1, buf_ysize=1, resample_alg=resample_alg) is None
+        with pytest.raises(Exception):
+            assert mem_ds.ReadAsArray(buf_xsize=1, buf_ysize=1, resample_alg=resample_alg) is None
+        with pytest.raises(Exception):
+            assert mem_ds.GetRasterBand(1).ReadAsArray(buf_xsize=1, buf_ysize=1, resample_alg=resample_alg) is None
+
+
+def test_rasterio_floating_point_window_no_resampling():
+    """ Test fix for #3101 """
+
+    ds = gdal.Translate('/vsimem/test.tif', gdal.Open('data/rgbsmall.tif'))
+    assert ds.GetMetadataItem('INTERLEAVE', 'IMAGE_STRUCTURE') == 'PIXEL'
+
+    # Check that GDALDataset::IRasterIO() in block-based strategy behaves the
+    # same as GDALRasterBand::IRasterIO() generic case (ie the one dealing
+    # with floating-point window coordinates)
+    data_per_band = b''.join( ds.GetRasterBand(i+1).ReadRaster(0.1,0.2,10.4,11.4,10,11) for i in range(3) )
+    data_per_dataset = ds.ReadRaster(0.1,0.2,10.4,11.4,10,11)
+    ds = None
+    gdal.Unlink('/vsimem/test.tif')
+    assert data_per_band == data_per_dataset
+
+
+def test_rasterio_floating_point_window_no_resampling_numpy():
+    # Same as above but using ReadAsArray() instead of ReadRaster()
+
+    try:
+        from osgeo import gdalnumeric
+        gdalnumeric.zeros
+        import numpy
+    except (ImportError, AttributeError):
+        pytest.skip()
+
+    ds = gdal.Translate('/vsimem/test.tif', gdal.Open('data/rgbsmall.tif'))
+    assert ds.GetMetadataItem('INTERLEAVE', 'IMAGE_STRUCTURE') == 'PIXEL'
+
+    data_per_band = numpy.stack([ds.GetRasterBand(i+1).ReadAsArray(0.1,0.2,10.4,11.4,buf_xsize=10,buf_ysize=11) for i in range(3)])
+    data_per_dataset = ds.ReadAsArray(0.1,0.2,10.4,11.4,buf_xsize=10,buf_ysize=11)
+    ds = None
+    gdal.Unlink('/vsimem/test.tif')
+    assert numpy.array_equal(data_per_band, data_per_dataset)

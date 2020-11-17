@@ -72,10 +72,10 @@ def test_kmlsuperoverlay_3():
     if f:
         data = gdal.VSIFReadL(1, 10000, f).decode('ascii')
         gdal.VSIFCloseL(f)
-    assert '<north>33.903651' in data, data
-    assert '<south>33.625312' in data, data
-    assert '<east>-117.309784' in data, data
-    assert '<west>-117.639992' in data, data
+    assert '<north>33.903' in data, data
+    assert '<south>33.625' in data, data
+    assert '<east>-117.309' in data, data
+    assert '<west>-117.639' in data, data
 
     filelist = ['tmp/0/0/0.jpg',
                 'tmp/0/0/0.kml',
@@ -262,7 +262,7 @@ def test_kmlsuperoverlay_5():
 
 def test_kmlsuperoverlay_6():
 
-    ds = gdal.Open('data/kmlimage.kmz')
+    ds = gdal.Open('data/kml/kmlimage.kmz')
     assert ds.GetProjectionRef().find('WGS_1984') >= 0
     got_gt = ds.GetGeoTransform()
     ref_gt = [1.2554125761846773, 1.6640895429971981e-05, 0.0, 43.452120815728101, 0.0, -1.0762348187666334e-05]
@@ -282,7 +282,7 @@ def test_kmlsuperoverlay_6():
 
 def test_kmlsuperoverlay_7():
 
-    ds = gdal.Open('data/small_world.kml')
+    ds = gdal.Open('data/kml/small_world.kml')
     assert ds.GetProjectionRef().find('WGS_1984') >= 0
     got_gt = ds.GetGeoTransform()
     ref_gt = [-180.0, 0.9, 0.0, 90.0, 0.0, -0.9]
@@ -299,7 +299,7 @@ def test_kmlsuperoverlay_7():
 
 def test_kmlsuperoverlay_single_overlay_document_folder_pct():
 
-    ds = gdal.Open('data/small_world_in_document_folder_pct.kml')
+    ds = gdal.Open('data/kml/small_world_in_document_folder_pct.kml')
     assert ds.GetProjectionRef().find('WGS_1984') >= 0
     got_gt = ds.GetGeoTransform()
     ref_gt = [-180.0, 0.9, 0.0, 90.0, 0.0, -0.9]

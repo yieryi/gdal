@@ -6,6 +6,8 @@ WCS -- OGC Web Coverage Service
 
 .. shortname:: WCS
 
+.. build_dependencies:: libcurl
+
 The optional GDAL WCS driver allows use of a coverage in a WCS server as
 a raster dataset. GDAL acts as a client to the WCS server.
 
@@ -270,7 +272,7 @@ documents through the key. Please consider using the Extra open options.
 Time
 ~~~~
 
-Starting with GDAL 1.9.0, this driver includes experimental support for
+This driver includes experimental support for
 time based WCS 1.0.0 servers. On initial access the last offered time
 position will be identified as the DefaultTime. Each time position
 available for the coverage will be treated as a subdataset.

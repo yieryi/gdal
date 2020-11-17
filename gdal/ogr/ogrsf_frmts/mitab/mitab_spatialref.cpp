@@ -57,6 +57,7 @@ CPL_CVSID("$Id$")
 extern const MapInfoDatumInfo asDatumInfoList[];
 extern const MapInfoSpheroidInfo asSpheroidInfoList[];
 
+/* EPSG code, MapInfo datum ID (or 9999), OGC Name, datum parameters... */
 const MapInfoDatumInfo asDatumInfoList[] =
 {
 
@@ -247,7 +248,7 @@ const MapInfoDatumInfo asDatumInfoList[] =
 { 0,    1013,"Russia_SK42",                52, 23.92,-141.27,-80.9, 0, -0.35,-0.82, -0.12, 0},
 { 0,    1014,"Russia_SK95",                52, 24.82,-131.21,-82.66,0,0,-0.16,-0.12, 0},
 { 6301, 1015,"Tokyo",                      10, -146.414, 507.337, 680.507,0,0,0,0,0},
-{ 0,    1016,"Finnish_KKJ",                4, -96.062, -82.428, -121.754, -4.801, -0.345, 1.376, 1.496, 0},
+{ 6123, 1016,"Kartastokoordinaattijarjestelma_1966", 4, -96.062, -82.428, -121.754, -4.801, -0.345, 1.376, 1.496, 0},
 { 6610, 1017,"Xian 1980",                  53, 24, -123, -94, -0.02, -0.25, 0.13, 1.1, 0},
 { 0,    1018,"Lithuanian Pulkovo 1942",    4, -40.59527, -18.54979, -69.33956, -2.508, -1.8319, 2.6114, -4.2991, 0},
 { 6313, 1019,"Belgian 1972 7 Parameter",   4, -99.059, 53.322, -112.486, -0.419, 0.83, -1.885, 0.999999, 0},
@@ -257,8 +258,10 @@ const MapInfoDatumInfo asDatumInfoList[] =
 { 0,    1023,"Hungarian Projection System (EOV) - updated", 21, 52.684, -71.194, -13.975, 0.312, 0.1063, 0.3729, 1.0191, 0 },
 { 1052, 1024,"S-JTSK (Krovak) Coordinate system - updated", 10, 570.6934, 85.6936, 462.8393, -4.99825, -1.58663, -5.26114, 3.5430155, 0 },
 { 0,    1025,"JTSK03 (Slovak Republic)",   10, 485.014055, 169.473618, 483.842943, -7.78625453, -4.39770887, -4.10248899, 0, 0 },
+{ 1168, 1028,"Geocentric Datum of Australia 2020", 0,-0.06155, 0.01087, 0.04019, 0.0394924, 0.0327221, 0.0328979, 0.009994,0 },
 { 0,    9999,"Bosnia-Herzegovina",         10, 472.8677, 187.8769, 544.7084, -5.76198422, -5.3222842, 12.80666941, 1.54517287, 0 },
 { 6181, 9999,"Luxembourg 1930 / Gauss",     4, -192.986, 13.673, -39.309, 0.4099, 2.9332, -2.6881, 0.43, 0 },
+{ 1168, 9999,"Geocentric Datum of Australia 2020", 0,-0.06155, 0.01087, 0.04019, 0.0394924, 0.0327221, 0.0328979, 0.009994,0 },
 
 { -1,   -1, nullptr,                          0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
@@ -892,7 +895,8 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
          * Transverse Mercator,(modified for Danish System 34 Jylland-Fyn)
          *---------------------------------------------------------------*/
       case 21:
-         poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_21,
+         //poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_21,
+         poSpatialRef->SetTM(
                                        sTABProj.adProjParams[1],
                                        sTABProj.adProjParams[0],
                                        sTABProj.adProjParams[2],
@@ -904,7 +908,8 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
          * Transverse Mercator,(modified for Danish System 34 Sjaelland)
          *-------------------------------------------------------------*/
       case 22:
-         poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_22,
+         //poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_22,
+         poSpatialRef->SetTM(
                                        sTABProj.adProjParams[1],
                                        sTABProj.adProjParams[0],
                                        sTABProj.adProjParams[2],
@@ -916,7 +921,8 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
          * Transverse Mercator,(modified for Danish System 34/45 Bornholm)
          *---------------------------------------------------------------*/
       case 23:
-         poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_23,
+         //poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_23,
+         poSpatialRef->SetTM(
                                        sTABProj.adProjParams[1],
                                        sTABProj.adProjParams[0],
                                        sTABProj.adProjParams[2],
@@ -928,7 +934,8 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
          * Transverse Mercator,(modified for Finnish KKJ)
          *-------------------------------------------------------------*/
       case 24:
-         poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_24,
+         //poSpatialRef->SetTMVariant( SRS_PT_TRANSVERSE_MERCATOR_MI_24,
+        poSpatialRef->SetTM(
                                        sTABProj.adProjParams[1],
                                        sTABProj.adProjParams[0],
                                        sTABProj.adProjParams[2],
@@ -1123,14 +1130,11 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
     /*-----------------------------------------------------------------
      * Collect units definition.
      *----------------------------------------------------------------*/
-    if( sTABProj.nProjId != 0 && sTABProj.nProjId != 1 && poSpatialRef->GetRoot() != nullptr )
+    if( sTABProj.nProjId != 0 && sTABProj.nProjId != 1 && CPLAtof( pszUnitsConv ) != 1 )
     {
-        OGR_SRSNode     *poUnits = new OGR_SRSNode("UNIT");
-
-        poSpatialRef->GetRoot()->AddChild(poUnits);
-
-        poUnits->AddChild( new OGR_SRSNode( pszUnitsName ) );
-        poUnits->AddChild( new OGR_SRSNode( pszUnitsConv ) );
+        poSpatialRef->SetTargetLinearUnits(nullptr,
+                                           pszUnitsName,
+                                           CPLAtof( pszUnitsConv ));
     }
 
     /*-----------------------------------------------------------------
@@ -1270,13 +1274,16 @@ OGRSpatialReference* TABFile::GetSpatialRefFromTABProj(const TABProjInfo& sTABPr
 
     if( psDatumInfo != nullptr )
     {
-        poSpatialRef->SetTOWGS84( psDatumInfo->dfShiftX,
-                                    psDatumInfo->dfShiftY,
-                                    psDatumInfo->dfShiftZ,
-                                    psDatumInfo->dfDatumParm0 == 0 ? 0 : -psDatumInfo->dfDatumParm0, /* avoids 0 to be transformed into -0 */
-                                    psDatumInfo->dfDatumParm1 == 0 ? 0 : -psDatumInfo->dfDatumParm1,
-                                    psDatumInfo->dfDatumParm2 == 0 ? 0 : -psDatumInfo->dfDatumParm2,
-                                    psDatumInfo->dfDatumParm3 );
+        if( CPLTestBool(CPLGetConfigOption("MITAB_SET_TOWGS84_ON_KNOWN_DATUM", "NO")) )
+        {
+            poSpatialRef->SetTOWGS84( psDatumInfo->dfShiftX,
+                                        psDatumInfo->dfShiftY,
+                                        psDatumInfo->dfShiftZ,
+                                        psDatumInfo->dfDatumParm0 == 0 ? 0 : -psDatumInfo->dfDatumParm0, /* avoids 0 to be transformed into -0 */
+                                        psDatumInfo->dfDatumParm1 == 0 ? 0 : -psDatumInfo->dfDatumParm1,
+                                        psDatumInfo->dfDatumParm2 == 0 ? 0 : -psDatumInfo->dfDatumParm2,
+                                        psDatumInfo->dfDatumParm3 );
+        }
     }
     else
     {
@@ -1528,6 +1535,17 @@ int TABFile::GetTABProjFromSpatialRef(const OGRSpatialReference* poSpatialRef,
     double dfLinearConv = poSpatialRef->GetLinearUnits( &pszLinearUnits );
     if( dfLinearConv == 0.0 )
         dfLinearConv = 1.0;
+
+    // Get datum information
+    const char *pszWKTDatum = poSpatialRef->GetAttrValue("DATUM");
+    int nDatumEPSGCode = -1;
+    const char *pszDatumAuthority = poSpatialRef->GetAuthorityName("DATUM");
+    const char *pszDatumCode = poSpatialRef->GetAuthorityCode("DATUM");
+
+    if (pszDatumCode && pszDatumAuthority && EQUAL(pszDatumAuthority, "EPSG"))
+    {
+        nDatumEPSGCode = atoi(pszDatumCode);
+    }
 
     /*-----------------------------------------------------------------
      * Transform the projection and projection parameters.
@@ -1788,6 +1806,12 @@ int TABFile::GetTABProjFromSpatialRef(const OGRSpatialReference* poSpatialRef,
     else if( EQUAL(pszProjection,SRS_PT_TRANSVERSE_MERCATOR) )
     {
         sTABProj.nProjId = 8;
+        if( (pszWKTDatum && EQUAL(pszWKTDatum,
+                "Kartastokoordinaattijarjestelma_1966")) || nDatumEPSGCode == 6123 )
+        {
+            // Special case for Finnish KKJ
+            sTABProj.nProjId = 24;
+        }
         parms[0] = poSpatialRef->GetNormProjParm(SRS_PP_CENTRAL_MERIDIAN,0.0);
         parms[1] = poSpatialRef->GetNormProjParm(SRS_PP_LATITUDE_OF_ORIGIN,0.0);
         parms[2] = poSpatialRef->GetProjParm(SRS_PP_SCALE_FACTOR,1.0);
@@ -1891,17 +1915,7 @@ int TABFile::GetTABProjFromSpatialRef(const OGRSpatialReference* poSpatialRef,
     /* ==============================================================
      * Translate Datum and Ellipsoid
      * ============================================================== */
-    const char *pszWKTDatum = poSpatialRef->GetAttrValue("DATUM");
     const MapInfoDatumInfo *psDatumInfo = nullptr;
-
-    int nDatumEPSGCode = -1;
-    const char *pszDatumAuthority = poSpatialRef->GetAuthorityName("DATUM");
-    const char *pszDatumCode = poSpatialRef->GetAuthorityCode("DATUM");
-
-    if (pszDatumCode && pszDatumAuthority && EQUAL(pszDatumAuthority, "EPSG"))
-    {
-        nDatumEPSGCode = atoi(pszDatumCode);
-    }
 
     /*-----------------------------------------------------------------
      * Default to WGS84 if we have no datum at all.
@@ -2081,7 +2095,7 @@ int TABFile::GetTABProjFromSpatialRef(const OGRSpatialReference* poSpatialRef,
     else if( dfLinearConv == 0.0254 || EQUAL(pszLinearUnits,"Inch")
              || EQUAL(pszLinearUnits,"IINCH") )
         sTABProj.nUnitsId = 2;
-    else if( dfLinearConv == CPLAtof(SRS_UL_FOOT_CONV)
+    else if( fabs(dfLinearConv - CPLAtof(SRS_UL_FOOT_CONV)) < 1e-15 * dfLinearConv
              || EQUAL(pszLinearUnits,SRS_UL_FOOT) )
         sTABProj.nUnitsId = 3;
     else if( EQUAL(pszLinearUnits,"YARD") || EQUAL(pszLinearUnits,"IYARD")
@@ -2093,10 +2107,10 @@ int TABFile::GetTABProjFromSpatialRef(const OGRSpatialReference* poSpatialRef,
         sTABProj.nUnitsId = 6;
     else if( dfLinearConv == 1.0 )
         sTABProj.nUnitsId = 7;
-    else if( dfLinearConv == CPLAtof(SRS_UL_US_FOOT_CONV)
+    else if( fabs(dfLinearConv - CPLAtof(SRS_UL_US_FOOT_CONV)) < 1e-15 * dfLinearConv
              || EQUAL(pszLinearUnits,SRS_UL_US_FOOT) )
         sTABProj.nUnitsId = 8;
-    else if( EQUAL(pszLinearUnits,SRS_UL_NAUTICAL_MILE) )
+    else if( dfLinearConv == 1852.0 || EQUAL(pszLinearUnits,SRS_UL_NAUTICAL_MILE) )
         sTABProj.nUnitsId = 9;
     else if( EQUAL(pszLinearUnits,SRS_UL_LINK)
              || EQUAL(pszLinearUnits,"GUNTERLINK") )

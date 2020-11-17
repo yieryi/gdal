@@ -31,7 +31,7 @@
 #include "cpl_conv.h"
 #include "ogrgeojsonreader.h"
 #include "ogrgeojsonwriter.h"
-#include "swq.h"
+#include "ogr_swq.h"
 #include "eeda.h"
 
 #include <algorithm>
@@ -701,7 +701,7 @@ bool GDALEEDALayer::IsSimpleComparison(const swq_expr_node* poNode)
 /*                             GetOperatorText()                        */
 /************************************************************************/
 
-static const char* GetOperatorText(int nOp)
+static const char* GetOperatorText(swq_op nOp)
 {
     if( nOp == SWQ_LT )
         return "<";
@@ -1230,7 +1230,7 @@ void GDALRegister_EEDA()
     poDriver->SetMetadataItem( GDAL_DCAP_VECTOR, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME,
                                "Earth Engine Data API" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "frmt_eeda.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/vector/eeda.html" );
     poDriver->SetMetadataItem( GDAL_DMD_CONNECTION_PREFIX, "EEDA:" );
     poDriver->SetMetadataItem( GDAL_DMD_OPENOPTIONLIST,
 "<OpenOptionList>"

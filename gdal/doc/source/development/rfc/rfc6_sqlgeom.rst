@@ -17,7 +17,7 @@ This proposal addresses and issue have been discovered long ago, and OGR
 provides no equivalent solution so far.
 
 Some of the supported formats like Mapinfo.tab may contain multiple
-geometry types and style information. In order to hanlde this kind of
+geometry types and style information. In order to handle this kind of
 data sources properly a support for selecting the layers by geometry
 type or by the style info would be highly required. For more details see
 the following MapServer related bugs later in this document.
@@ -75,7 +75,7 @@ will be added to ogr_p.h
 ::
 
    CPL_C_START
-   #include "swq.h"
+   #include "ogr_swq.h"
    CPL_C_END
 
    #define SPF_FID 0

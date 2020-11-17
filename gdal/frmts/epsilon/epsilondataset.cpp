@@ -213,7 +213,8 @@ CPLErr EpsilonRasterBand::IReadBlock( int nBlockXOff,
 
     BlockDesc* psDesc = &poGDS->pasBlocks[nBlock];
 #ifdef DEBUG
-    int l_nBlocksPerColumn = (poGDS->nRasterYSize + nBlockYSize - 1) / nBlockYSize;
+    const int l_nBlocksPerColumn = (poGDS->nRasterYSize + nBlockYSize - 1) / nBlockYSize;
+    CPL_IGNORE_RET_VAL(l_nBlocksPerColumn);
     CPLAssert(psDesc->x == nBlockXOff * nBlockXSize);
     CPLAssert(psDesc->y == nBlockYOff * nBlockYSize);
     CPLAssert(psDesc->w == (nBlockXOff < l_nBlocksPerRow - 1) ?
@@ -1005,7 +1006,7 @@ void GDALRegister_EPSILON()
     poDriver->SetMetadataItem( GDAL_DCAP_RASTER, "YES" );
 
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME, "Epsilon wavelets" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "frmt_epsilon.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/raster/epsilon.html" );
     poDriver->SetMetadataItem( GDAL_DMD_CREATIONDATATYPES, "Byte" );
 
     CPLString osMethods;

@@ -150,9 +150,13 @@ void GRIBRasterBand::FindPDSTemplate()
 
     // Read section 0
     GByte abySection0[16];
-    VSIFSeekL(poGDS->fp, start, SEEK_SET);
-    VSIFReadL(abySection0, 16, 1, poGDS->fp);
-    GByte nDiscipline = abySection0[7 - 1]; 
+    if( VSIFSeekL(poGDS->fp, start, SEEK_SET) != 0 ||
+        VSIFReadL(abySection0, 16, 1, poGDS->fp) != 1 )
+    {
+        CPLDebug("GRIB", "Cannot read leading bytes of section 0");
+        return;
+    }
+    GByte nDiscipline = abySection0[7 - 1];
     CPLString osDiscipline;
     osDiscipline = CPLString().Printf("%d", nDiscipline);
     static const char * const table00[] = {
@@ -179,7 +183,12 @@ void GRIBRasterBand::FindPDSTemplate()
     SetMetadataItem("GRIB_DISCIPLINE", osDiscipline.c_str());
 
     GByte abyHead[5] = { 0 };
-    VSIFReadL(abyHead, 5, 1, poGDS->fp);
+
+    if( VSIFReadL(abyHead, 5, 1, poGDS->fp) != 1 )
+    {
+        CPLDebug("GRIB", "Cannot read 5 leading bytes past section 0");
+        return;
+    }
 
     GUInt32 nSectSize = 0;
     if( abyHead[4] == 1 )
@@ -305,7 +314,53 @@ void GRIBRasterBand::FindPDSTemplate()
             CPLFree(pabyBody);
         }
 
-        VSIFReadL(abyHead, 5, 1, poGDS->fp);
+        if( VSIFReadL(abyHead, 5, 1, poGDS->fp) != 1 )
+        {
+            CPLDebug("GRIB", "Cannot read 5 leading bytes past section 1");
+            return;
+        }
+    }
+
+    if( subgNum > 0 )
+    {
+        // If we are a subgrid, then iterate over all preceding subgrids
+        for( int iSubMessage = 0; iSubMessage < subgNum; )
+        {
+            memcpy(&nSectSize, abyHead, 4);
+            CPL_MSBPTR32(&nSectSize);
+            if( nSectSize < 5 )
+            {
+                CPLDebug("GRIB",
+                         "Invalid section size for iSubMessage = %d",
+                         iSubMessage);
+                return;
+            }
+            if( VSIFSeekL(poGDS->fp, nSectSize - 5, SEEK_CUR) != 0 )
+            {
+                CPLDebug("GRIB",
+                         "Cannot read past section for iSubMessage = %d",
+                         iSubMessage);
+                return;
+            }
+            if( abyHead[4] < 2 || abyHead[4] > 7 )
+            {
+                CPLDebug("GRIB",
+                         "Invalid section number for iSubMessage = %d",
+                         iSubMessage);
+                return;
+            }
+            if( abyHead[4] == 7 )
+            {
+                ++iSubMessage;
+            }
+            if( VSIFReadL(abyHead, 5, 1, poGDS->fp) != 1 )
+            {
+                CPLDebug("GRIB",
+                         "Cannot read 5 leading bytes for iSubMessage = %d",
+                         iSubMessage);
+                return;
+            }
+        }
     }
 
     // Skip to section 4
@@ -314,16 +369,25 @@ void GRIBRasterBand::FindPDSTemplate()
         memcpy(&nSectSize, abyHead, 4);
         CPL_MSBPTR32(&nSectSize);
 
-        if( nSectSize < 5 ||
-            VSIFSeekL(poGDS->fp, nSectSize - 5, SEEK_CUR) != 0 ||
+        const int nCurSection = abyHead[4];
+        if( nSectSize < 5 )
+        {
+            CPLDebug("GRIB", "Invalid section size for section %d",
+                     nCurSection);
+            return;
+        }
+        if( VSIFSeekL(poGDS->fp, nSectSize - 5, SEEK_CUR) != 0 ||
             VSIFReadL(abyHead, 5, 1, poGDS->fp) != 1 )
-            break;
+        {
+            CPLDebug("GRIB", "Cannot read section %d", nCurSection);
+            return;
+        }
     }
 
     // Collect section 4 octet information.  We read the file
     // ourselves since the GRIB API does not appear to preserve all
     // this for us.
-    if( abyHead[4] == 4 )
+    // if( abyHead[4] == 4 )
     {
         memcpy(&nSectSize, abyHead, 4);
         CPL_MSBPTR32(&nSectSize);
@@ -335,6 +399,7 @@ void GRIBRasterBand::FindPDSTemplate()
             if( VSIFReadL(pabyBody + 5, 1, nSectSize - 5, poGDS->fp) !=
                     nSectSize - 5 )
             {
+                CPLDebug("GRIB", "Cannot read section 4");
                 CPLFree(pabyBody);
                 return;
             }
@@ -437,6 +502,10 @@ void GRIBRasterBand::FindPDSTemplate()
             CPLFree(pabyBody);
 
             FindNoDataGrib2(false);
+        }
+        else
+        {
+            CPLDebug("GRIB", "Invalid section size for section %d", 4);
         }
     }
 }
@@ -784,17 +853,21 @@ double GRIBRasterBand::GetNoDataValue( int *pbSuccess )
         ReadGribData(poGDS->fp, start, subgNum, nullptr, &m_Grib_MetaData);
         if( m_Grib_MetaData == nullptr )
         {
-            if (pbSuccess)
-            *pbSuccess = FALSE;
-            return 0;
+            m_bHasNoData = false;
+            m_dfNoData = 0;
+            if( pbSuccess )
+                *pbSuccess = m_bHasNoData;
+            return m_dfNoData;
         }
     }
 
     if( m_Grib_MetaData->gridAttrib.f_miss == 0)
     {
+        m_bHasNoData = false;
+        m_dfNoData = 0;
         if (pbSuccess)
-            *pbSuccess = FALSE;
-        return 0;
+            *pbSuccess = m_bHasNoData;
+        return m_dfNoData;
     }
 
     if (m_Grib_MetaData->gridAttrib.f_miss == 2)
@@ -804,9 +877,11 @@ double GRIBRasterBand::GetNoDataValue( int *pbSuccess )
                  nBand, m_Grib_MetaData->gridAttrib.missSec);
     }
 
+    m_bHasNoData = true;
+    m_dfNoData = m_Grib_MetaData->gridAttrib.missPri;
     if (pbSuccess)
-        *pbSuccess = TRUE;
-    return m_Grib_MetaData->gridAttrib.missPri;
+        *pbSuccess = m_bHasNoData;
+    return m_dfNoData;
 }
 
 /************************************************************************/
@@ -1577,7 +1652,7 @@ void GRIBArray::Finalize(GRIBGroup* poGroup, inventoryType *psInv)
 
     std::shared_ptr<GDALDimension> poDimTime;
 
-    for( const auto poDim: poGroup->m_dims )
+    for( const auto& poDim: poGroup->m_dims )
     {
         if( STARTS_WITH(poDim->GetName().c_str(), "TIME") &&
             poDim->GetSize() == m_adfTimes.size() )
@@ -1940,6 +2015,15 @@ GDALDataset *GRIBDataset::OpenMultiDim( GDALOpenInfo *poOpenInfo )
 
     poDS->fp = nullptr;
     poDS->m_poRootGroup = poRootGroup;
+
+    poDS->SetDescription(poOpenInfo->pszFilename);
+
+    // Release hGRIBMutex otherwise we'll deadlock with GDALDataset own
+    // hGRIBMutex.
+    CPLReleaseMutex(hGRIBMutex);
+    poDS->TryLoadXML();
+    CPLAcquireMutex(hGRIBMutex, 1000.0);
+
     return poDS;
 }
 
@@ -1963,12 +2047,7 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
         // No projection, only latlon system (geographic).
         break;
     case GS3_ROTATED_LATLON:
-        CPLDebug("GRIB", "angleRotate=%f, southLat=%f, southLon=%f, poleLat=%f, poleLon=%f",
-                 meta->gds.angleRotate,
-                 meta->gds.southLat,
-                 meta->gds.southLon,
-                 meta->gds.poleLat,
-                 meta->gds.poleLon);
+        // will apply pole rotation afterwards
         break;
     case GS3_MERCATOR:
         if( meta->gds.orientLon == 0.0 )
@@ -2003,7 +2082,7 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
         break;
     case GS3_ALBERS_EQUAL_AREA:
         oSRS.SetACEA(meta->gds.scaleLat1, meta->gds.scaleLat2, meta->gds.meshLat,
-                    meta->gds.orientLon, 0.0, 0.0); 
+                    meta->gds.orientLon, 0.0, 0.0);
         break;
 
     case GS3_ORTHOGRAPHIC:
@@ -2071,6 +2150,16 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
         }
     }
 
+    if( meta->gds.projType == GS3_ROTATED_LATLON )
+    {
+        oSRS.SetDerivedGeogCRSWithPoleRotationGRIBConvention(
+            oSRS.GetName(),
+            meta->gds.southLat,
+            meta->gds.southLon > 180 ?
+                meta->gds.southLon - 360 : meta->gds.southLon,
+            meta->gds.angleRotate);
+    }
+
     OGRSpatialReference oLL;  // Construct the "geographic" part of oSRS.
     oLL.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     oLL.CopyGeogCSFrom(&oSRS);
@@ -2100,7 +2189,7 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
         rPixelSizeX = meta->gds.Dx;
         rPixelSizeY = meta->gds.Dy;
     }
-    else if( oSRS.IsProjected() )
+    else if( oSRS.IsProjected() && meta->gds.projType != GS3_ROTATED_LATLON )
     {
         // Longitude in degrees, to be transformed to meters (or degrees in
         // case of latlon).
@@ -2205,17 +2294,6 @@ void GRIBDataset::SetGribMetaData(grib_MetaData *meta)
     adfGeoTransform[1] = rPixelSizeX;
     adfGeoTransform[5] = -rPixelSizeY;
 
-    if( meta->gds.projType == GS3_ROTATED_LATLON &&
-        meta->gds.angleRotate == 0 )
-    {
-        oSRS.SetProjection( "Rotated_pole" );
-        oSRS.SetExtension(
-            "PROJCS", "PROJ4",
-            CPLSPrintf("+proj=ob_tran +lon_0=%.18g +o_proj=longlat +o_lon_p=0 "
-                       "+o_lat_p=%.18g +a=%.18g +b=%.18g +to_meter=0.0174532925199 +wktext",
-                       meta->gds.southLon, -meta->gds.southLat, a, b));
-    }
-
     if( bError )
         m_poSRS.reset();
     else
@@ -2264,7 +2342,7 @@ GDALGRIBDriver::GDALGRIBDriver() : bHasFullInitMetadata(false)
 {
     aosMetadata.SetNameValue(GDAL_DCAP_RASTER, "YES");
     aosMetadata.SetNameValue(GDAL_DMD_LONGNAME, "GRIdded Binary (.grb, .grb2)");
-    aosMetadata.SetNameValue(GDAL_DMD_HELPTOPIC, "frmt_grib.html");
+    aosMetadata.SetNameValue(GDAL_DMD_HELPTOPIC, "drivers/raster/grib.html");
     aosMetadata.SetNameValue(GDAL_DMD_EXTENSIONS, "grb grb2 grib2");
     aosMetadata.SetNameValue(GDAL_DCAP_VIRTUALIO, "YES");
 
@@ -2310,7 +2388,7 @@ char** GDALGRIBDriver::GetMetadata(const char* pszDomain)
             if( !aosJ2KDrivers.empty() )
                 osCreationOptionList +=
 "       <Value>JPEG2000</Value>";
-            osCreationOptionList += 
+            osCreationOptionList +=
 "   </Option>"
 "   <Option name='NBITS' type='int' default='0' "
     "description='Number of bits per value'/>"
@@ -2322,7 +2400,7 @@ char** GDALGRIBDriver::GetMetadata(const char* pszDomain)
             if( !aosJ2KDrivers.empty() )
             {
                 osCreationOptionList +=
-"   <Option name='COMPRESSION_RATIO' type='int' default='1' min='1' max='100'"
+"   <Option name='COMPRESSION_RATIO' type='int' default='1' min='1' max='100' "
     "description='N:1 target compression ratio for JPEG2000'/>"
 "   <Option name='JPEG2000_DRIVER' type='string-select' "
     "description='Explicitly select a JPEG2000 driver'>";

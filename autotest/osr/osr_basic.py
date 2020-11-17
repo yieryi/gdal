@@ -386,6 +386,7 @@ def test_osr_basic_12():
 def test_osr_basic_13():
 
     srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4328)
     with gdaltest.config_option('OSR_USE_NON_DEPRECATED', 'NO'):
         srs.ImportFromEPSG(4328)
 
@@ -534,8 +535,7 @@ def test_osr_basic_17():
 
 def test_osr_basic_18():
 
-    # This is a dummy one, but who cares
-    wkt = osr.GetUserInputAsWKT('http://www.opengis.net/def/crs-compound?1=http://www.opengis.net/def/crs/EPSG/0/4326&2=http://www.opengis.net/def/crs/EPSG/0/4326')
+    wkt = osr.GetUserInputAsWKT('http://www.opengis.net/def/crs-compound?1=http://www.opengis.net/def/crs/EPSG/0/4326&2=http://www.opengis.net/def/crs/EPSG/0/3855')
     assert wkt.startswith('COMPD_CS'), 'CRS URL parsing not as expected.'
 
 ###############################################################################
@@ -1598,3 +1598,68 @@ def test_osr_export_projjson():
         pytest.skip()
 
     assert sr.ExportToPROJJSON() != ''
+
+
+def test_osr_promote_to_3D():
+
+    sr = osr.SpatialReference()
+    sr.SetFromUserInput('WGS84')
+
+    if not(osr.GetPROJVersionMajor() > 6 or osr.GetPROJVersionMinor() >= 3):
+        with gdaltest.error_handler():
+            sr.PromoteTo3D()
+        pytest.skip()
+
+    assert sr.PromoteTo3D() == 0
+    assert sr.GetAuthorityCode(None) == '4979'
+
+    assert sr.DemoteTo2D() == 0
+    assert sr.GetAuthorityCode(None) == '4326'
+
+
+def test_osr_SetVerticalPerspective():
+
+    sr = osr.SpatialReference()
+    sr.SetVerticalPerspective(1, 2, 0, 3, 4, 5)
+    assert sr.ExportToProj4() == '+proj=nsper +lat_0=1 +lon_0=2 +h=3 +x_0=4 +y_0=5 +datum=WGS84 +units=m +no_defs'
+    if osr.GetPROJVersionMajor() > 6 or osr.GetPROJVersionMinor() >= 3:
+        assert sr.GetAttrValue('PROJECTION') in 'Vertical Perspective'
+        assert sr.GetNormProjParm('Longitude of topocentric origin') == 2
+
+
+def test_osr_create_in_one_thread_destroy_in_other():
+    def threaded_function(arg):
+        sr = osr.SpatialReference()
+        sr.ImportFromEPSG(32631)
+        arg[0] = sr
+
+    arg = [ None ]
+
+    thread = Thread(target = threaded_function, args = (arg, ))
+    thread.start()
+    thread.join()
+    assert arg[0]
+    del arg[0]
+
+
+def test_osr_SpatialReference_invalid_wkt_in_constructor():
+
+    with pytest.raises(RuntimeError):
+        osr.SpatialReference('invalid')
+
+
+###############################################################################
+# Check GetUTMZone() on a Projected 3D CRS
+
+def test_osr_GetUTMZone_Projected3D():
+
+    utm_srs = osr.SpatialReference()
+    # Southern hemisphere
+    utm_srs.SetUTM(11, 0)
+    utm_srs.SetWellKnownGeogCS('WGS84')
+
+    assert utm_srs.GetUTMZone() == -11
+
+    utm_srs.PromoteTo3D()
+
+    assert utm_srs.GetUTMZone() == -11

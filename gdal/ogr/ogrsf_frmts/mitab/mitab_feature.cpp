@@ -589,9 +589,11 @@ int TABFeature::WriteRecordToDATFile(TABDATFile *poDATFile,
             }
             else
             {
-                nHour = 0;
-                nMin = 0;
-                fSec = 0;
+                // Put negative values, so that WriteTimeField() forges
+                // a negative value, and ultimately write -1 in the binary field
+                nHour = -1;
+                nMin = -1;
+                fSec = -1;
             }
             nStatus = poDATFile->WriteTimeField(nHour, nMin, static_cast<int>(fSec),
                                                 OGR_GET_MS(fSec), poINDFile,
@@ -1561,6 +1563,11 @@ const char *TABFontPoint::GetStyleString() const
     return m_pszStyleString;
 }
 
+/**********************************************************************
+ *                   TABFontPoint::SetSymbolFromStyle()
+ *
+ *  Set all Symbol var from a OGRStyleSymbol.
+ **********************************************************************/
 void TABFontPoint::SetSymbolFromStyle(OGRStyleSymbol* poSymbolStyle)
 {
     ITABFeatureSymbol::SetSymbolFromStyle(poSymbolStyle);
@@ -1770,6 +1777,80 @@ int TABCustomPoint::WriteGeometryToMAPFile(TABMAPFile *poMapFile,
         return -1;
 
     return 0;
+}
+
+/**********************************************************************
+ *                   TABCustomPoint::GetSymbolStyleString()
+ *
+ *  Return a Symbol() string. All representations info for the Symbol are here.
+ **********************************************************************/
+const char* TABCustomPoint::GetSymbolStyleString(double dfAngle) const
+{
+    /* Get the SymbolStyleString, and add the color if m_nCustomStyle contains "apply color". */
+    const char *color = nullptr;
+    if (m_nCustomStyle & 0x02)
+        color = CPLSPrintf(",c:#%6.6x", m_sSymbolDef.rgbColor);
+    else
+        color = "";
+
+    int         nAngle = static_cast<int>(dfAngle);
+    const char* pszStyle;
+    const char* pszExt = CPLGetExtension(GetSymbolNameRef());
+    char        szLowerExt[8] = "";
+    const char* pszPtr = pszExt;
+    int         i;
+
+    for(i=0; i < 7 && *pszPtr != '\0' && *pszPtr != ' '; i++, pszPtr++)
+    {
+        szLowerExt[i] = static_cast<char>(tolower(*pszPtr));
+    }
+    szLowerExt[i] = '\0';
+
+    pszStyle=CPLSPrintf("SYMBOL(a:%d%s,s:%dpt,id:\"mapinfo-custom-sym-%d-%s,%s-%s,ogr-sym-9\")",
+                        nAngle,
+                        color,
+                        m_sSymbolDef.nPointSize,
+                        m_nCustomStyle,
+                        GetSymbolNameRef(),
+                        szLowerExt,
+                        GetSymbolNameRef());
+    return pszStyle;
+}
+
+/**********************************************************************
+ *                   TABCustomPoint::SetSymbolFromStyle()
+ *
+ *  Set all Symbol var from a OGRStyleSymbol.
+ **********************************************************************/
+void TABCustomPoint::SetSymbolFromStyle(OGRStyleSymbol* poSymbolStyle)
+{
+   ITABFeatureSymbol::SetSymbolFromStyle(poSymbolStyle);
+
+    GBool bIsNull = 0;
+
+    // Try to set font glyph number
+    const char* pszSymbolId = poSymbolStyle->Id(bIsNull);
+    if((!bIsNull) && pszSymbolId && STARTS_WITH(pszSymbolId, "mapinfo-custom-sym-"))
+    {
+        const int nSymbolStyle = atoi(pszSymbolId+19);
+        SetCustomSymbolStyle(static_cast<GByte>(nSymbolStyle));
+        
+        const char* pszPtr = pszSymbolId+19;
+        while (*pszPtr != '-') 
+        {
+            pszPtr++;
+        }
+        pszPtr++;
+        
+        char szSymbolName[256] = "";
+        int  i;
+        for(i=0; i < 255 && *pszPtr != '\0' && *pszPtr != ',' && *pszPtr != '"'; i++, pszPtr++)
+        {
+            szSymbolName[i] = *pszPtr;
+        }
+        szSymbolName[i] = '\0';
+        SetSymbolName(szSymbolName);
+    }
 }
 
 /**********************************************************************
@@ -8446,7 +8527,6 @@ void  ITABFeaturePen::SetPenFromStyleString(const char *pszStyleString)
 
     const char *pszPenPattern = nullptr;
 
-    int nPenId = 0;
     // Set the Id of the Pen, use Pattern if necessary.
     if(pszPenName &&
        (strstr(pszPenName, "mapinfo-pen-") || strstr(pszPenName, "ogr-pen-")) )
@@ -8454,7 +8534,7 @@ void  ITABFeaturePen::SetPenFromStyleString(const char *pszStyleString)
         const char* pszPenId = strstr(pszPenName, "mapinfo-pen-");
         if( pszPenId != nullptr )
         {
-            nPenId = atoi(pszPenId+12);
+            const int nPenId = atoi(pszPenId+12);
             SetPenPattern(static_cast<GByte>(nPenId));
         }
         else
@@ -8462,7 +8542,7 @@ void  ITABFeaturePen::SetPenFromStyleString(const char *pszStyleString)
             pszPenId = strstr(pszPenName, "ogr-pen-");
             if( pszPenId != nullptr )
             {
-                nPenId = atoi(pszPenId+8);
+                int nPenId = atoi(pszPenId+8);
                 if(nPenId == 0)
                     nPenId = 2;
                 SetPenPattern(static_cast<GByte>(nPenId));
@@ -9042,6 +9122,76 @@ void ITABFeatureSymbol::SetSymbolFromStyleString(const char *pszStyleString)
     delete poStylePart;
 
     return;
+}
+
+/**********************************************************************
+ *                   ITABFeatureSymbol::GetSymbolFeatureClass()
+ *
+ *  Return the feature class needed to represent the style string.
+ **********************************************************************/
+TABFeatureClass ITABFeatureSymbol::GetSymbolFeatureClass(const char *pszStyleString)
+{
+    // Use the Style Manager to retrieve all the information we need.
+    OGRStyleMgr *poStyleMgr = new OGRStyleMgr(nullptr);
+    OGRStyleTool *poStylePart = nullptr;
+
+    // Init the StyleMgr with the StyleString.
+    poStyleMgr->InitStyleString(pszStyleString);
+
+    // Retrieve the Symbol info.
+    const int numParts = poStyleMgr->GetPartCount();
+    for( int i = 0; i < numParts; i++ )
+    {
+        poStylePart = poStyleMgr->GetPart(i);
+        if( poStylePart == nullptr )
+        {
+            continue;
+        }
+
+        if(poStylePart->GetType() == OGRSTCSymbol)
+        {
+            break;
+        }
+        else
+        {
+            delete poStylePart;
+            poStylePart = nullptr;
+        }
+    }
+    
+    TABFeatureClass result = TABFCPoint;
+
+    // If the no Symbol found, do nothing.
+    if(poStylePart == nullptr)
+    {
+        delete poStyleMgr;
+        return result;
+    }
+
+    OGRStyleSymbol *poSymbolStyle = cpl::down_cast<OGRStyleSymbol*>(poStylePart);
+
+    GBool bIsNull = 0;
+
+    // Set the Symbol Id (SymbolNo)
+    const char *pszSymbolId = poSymbolStyle->Id(bIsNull);
+    if(bIsNull) pszSymbolId = nullptr;
+
+    if(pszSymbolId)
+    {
+        if(STARTS_WITH(pszSymbolId, "font-sym-"))
+        {
+            result = TABFCFontPoint;
+        }
+        else if(STARTS_WITH(pszSymbolId, "mapinfo-custom-sym-"))
+        {
+            result = TABFCCustomPoint;
+        }
+    }
+
+    delete poStyleMgr;
+    delete poStylePart;
+
+    return result;
 }
 
 /**********************************************************************

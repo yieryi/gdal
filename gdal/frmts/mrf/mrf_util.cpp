@@ -199,7 +199,7 @@ ILImage::ILImage() :
     pagecount(pcount(size, pagesize)),
     comp(IL_PNG),
     order(IL_Interleaved),
-    nbo(0),
+    nbo(false),
     hasNoData(FALSE),
     NoDataValue(0.0),
     dt(GDT_Unknown),
@@ -294,10 +294,10 @@ bool is_Endianess_Dependent(GDALDataType dt, ILCompression comp) {
     return false;
 }
 
-GDALMRFRasterBand *newMRFRasterBand(GDALMRFDataset *pDS, const ILImage &image, int b, int level)
+MRFRasterBand *newMRFRasterBand(MRFDataset *pDS, const ILImage &image, int b, int level)
 
 {
-    GDALMRFRasterBand *bnd = nullptr;
+    MRFRasterBand *bnd = nullptr;
     CPLErrorReset();
     switch(pDS->current.comp)
     {
@@ -597,7 +597,7 @@ void GDALRegister_mrf()
     GDALDriver *driver = new GDALDriver();
     driver->SetDescription("MRF");
     driver->SetMetadataItem(GDAL_DMD_LONGNAME, "Meta Raster Format");
-    driver->SetMetadataItem(GDAL_DMD_HELPTOPIC, "frmt_marfa.html");
+    driver->SetMetadataItem(GDAL_DMD_HELPTOPIC, "drivers/raster/marfa.html");
     driver->SetMetadataItem(GDAL_DMD_EXTENSION, "mrf");
     driver->SetMetadataItem(GDAL_DCAP_VIRTUALIO, "YES");
 
@@ -655,10 +655,10 @@ void GDALRegister_mrf()
       "</OpenOptionList>"
       );
 
-    driver->pfnOpen = GDALMRFDataset::Open;
-    driver->pfnIdentify = GDALMRFDataset::Identify;
-    driver->pfnCreateCopy = GDALMRFDataset::CreateCopy;
-    driver->pfnCreate = GDALMRFDataset::Create;
-    driver->pfnDelete = GDALMRFDataset::Delete;
+    driver->pfnOpen = MRFDataset::Open;
+    driver->pfnIdentify = MRFDataset::Identify;
+    driver->pfnCreateCopy = MRFDataset::CreateCopy;
+    driver->pfnCreate = MRFDataset::Create;
+    driver->pfnDelete = MRFDataset::Delete;
     GetGDALDriverManager()->RegisterDriver(driver);
 }

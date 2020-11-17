@@ -89,7 +89,7 @@ void CPCIDSKSegment::SetMetadataValue( const std::string &key, const std::string
 }
 
 /************************************************************************/
-/*                           GetMetdataKeys()                           */
+/*                           GetMetadataKeys()                           */
 /************************************************************************/
 std::vector<std::string> CPCIDSKSegment::GetMetadataKeys() const
 {
@@ -106,7 +106,9 @@ void CPCIDSKSegment::LoadSegmentPointer( const char *segment_pointer )
     PCIDSKBuffer segptr( segment_pointer, 32 );
 
     segment_flag = segptr.buffer[0];
-    segment_type = (eSegType) (atoi(segptr.Get(1,3)));
+    const int segment_type_int = atoi(segptr.Get(1,3));
+    segment_type = SegmentTypeName(segment_type_int) == "UNKNOWN" ?
+        SEG_UNKNOWN : static_cast<eSegType>(segment_type_int);
     data_offset = atouint64(segptr.Get(12,11));
     if( data_offset == 0 )
         data_offset = 0; // throw exception maybe ?
@@ -236,6 +238,7 @@ void CPCIDSKSegment::WriteToFile( const void *buffer, uint64 offset, uint64 size
         data_size += blocks_to_add * 512;
     }
 
+    assert(file); // avoid CLang Static Analyzer false positive
     file->WriteToFile( buffer, offset + data_offset + 1024, size );
 }
 

@@ -37,6 +37,7 @@ import gdaltest
 import pytest
 
 from gcore.testnonboundtoswig import setup as testnonboundtoswig_setup  # noqa
+testnonboundtoswig_setup; # to please pyflakes
 
 ###############################################################################
 # Use common test for /vsicrypt
@@ -232,7 +233,7 @@ def test_vsicrypt_2():
         fp = gdal.VSIFOpenL('/vsicrypt/key=dont_use_in_prod,file=/vsimem/file.bin', 'ab')
     assert fp is None
 
-    # Test creating with potentially not build-in alg:
+    # Test creating with potentially not built-in alg:
     with gdaltest.error_handler():
         fp = gdal.VSIFOpenL('/vsicrypt/alg=blowfish,key=DONT_USE_IN_PROD,file=/vsimem/file.bin', 'wb')
     if fp is not None:

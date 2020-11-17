@@ -283,15 +283,14 @@ void OGRMakeWktCoordinate( char *pszTarget, double x, double y, double z,
     memcpy(pszTarget, wkt.data(), wkt.size() + 1);
 }
 
+static bool isInteger(const std::string& s)
+{
+    return s.find_first_not_of("0123456789") == std::string::npos;
+}
 
 std::string OGRMakeWktCoordinate(double x, double y, double z, int nDimension,
     OGRWktOptions opts)
 {
-    auto isInteger = [](const std::string s)
-    {
-        return s.find_first_not_of("'0123456789") == std::string::npos;
-    };
-
     std::string xval;
     std::string yval;
 
@@ -355,11 +354,6 @@ std::string OGRMakeWktCoordinateM(double x, double y, double z, double m,
                                   OGRBoolean hasZ, OGRBoolean hasM,
                                   OGRWktOptions opts)
 {
-    auto isInteger = [](const std::string s)
-    {
-        return s.find_first_not_of("'0123456789") == std::string::npos;
-    };
-
     std::string xval, yval;
     if( opts.format == OGRWktFormat::Default &&
         CPLIsDoubleAnInt(x) && CPLIsDoubleAnInt(y) )
@@ -383,17 +377,17 @@ std::string OGRMakeWktCoordinateM(double x, double y, double z, double m,
     opts.format = OGRWktFormat::G;
     if( hasZ )
     {
-        if( opts.format == OGRWktFormat::Default && CPLIsDoubleAnInt(z) )
+        /*if( opts.format == OGRWktFormat::Default && CPLIsDoubleAnInt(z) )
             wkt += " " + std::to_string(static_cast<int>(z));
-        else
+        else*/
             wkt += " " + OGRFormatDouble(z, opts);
     }
 
     if( hasM )
     {
-        if( opts.format == OGRWktFormat::Default && CPLIsDoubleAnInt(m) )
+        /*if( opts.format == OGRWktFormat::Default && CPLIsDoubleAnInt(m) )
             wkt += " " + std::to_string(static_cast<int>(m));
-        else
+        else*/
             wkt += " " + OGRFormatDouble(m, opts);
     }
     return wkt;
@@ -1767,4 +1761,69 @@ OGRErr OGRReadWKBGeometryType( const unsigned char * pabyData,
     *peGeometryType = static_cast<OGRwkbGeometryType>(iRawType);
 
     return OGRERR_NONE;
+}
+
+/************************************************************************/
+/*                        OGRFormatFloat()                              */
+/************************************************************************/
+
+int  OGRFormatFloat(char *pszBuffer, int nBufferLen,
+                    float fVal, int nPrecision, char chConversionSpecifier)
+{
+    int nSize = 0;
+    char szFormatting[32] = {};
+    constexpr int MAX_SIGNIFICANT_DIGITS_FLOAT32 = 8;
+    const int nInitialSignificantFigures =
+        nPrecision >= 0 ? nPrecision : MAX_SIGNIFICANT_DIGITS_FLOAT32;
+
+    CPLsnprintf(szFormatting, sizeof(szFormatting),
+                "%%.%d%c",
+                nInitialSignificantFigures,
+                chConversionSpecifier);
+    nSize = CPLsnprintf(pszBuffer, nBufferLen, szFormatting, fVal);
+    const char* pszDot = strchr(pszBuffer, '.');
+
+    // Try to avoid 0.34999999 or 0.15000001 rounding issues by
+    // decreasing a bit precision.
+    if( nInitialSignificantFigures >= 8 &&
+        pszDot != nullptr &&
+        (strstr(pszDot, "99999") != nullptr ||
+         strstr(pszDot, "00000") != nullptr) )
+    {
+        const CPLString osOriBuffer(pszBuffer, nSize);
+
+        bool bOK = false;
+        for( int i = 1; i <= 3; i++ )
+        {
+            CPLsnprintf(szFormatting, sizeof(szFormatting),
+                        "%%.%d%c",
+                        nInitialSignificantFigures - i,
+                        chConversionSpecifier);
+            nSize = CPLsnprintf(pszBuffer, nBufferLen,
+                                szFormatting, fVal);
+            pszDot = strchr(pszBuffer, '.');
+            if( pszDot != nullptr &&
+                strstr(pszDot, "99999") == nullptr &&
+                strstr(pszDot, "00000") == nullptr &&
+                static_cast<float>(CPLAtof(pszBuffer)) == fVal )
+            {
+                bOK = true;
+                break;
+            }
+        }
+        if( !bOK )
+        {
+            memcpy(pszBuffer, osOriBuffer.c_str(), osOriBuffer.size()+1);
+            nSize = static_cast<int>(osOriBuffer.size());
+        }
+    }
+
+    if( nSize+2 < static_cast<int>(nBufferLen) &&
+        strchr(pszBuffer, '.') == nullptr &&
+        strchr(pszBuffer, 'e') == nullptr )
+    {
+        nSize += CPLsnprintf(pszBuffer + nSize, nBufferLen - nSize, ".0");
+    }
+
+    return nSize;
 }

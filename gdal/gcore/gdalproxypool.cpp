@@ -209,6 +209,7 @@ void GDALDatasetPool::CheckLinks()
         CPLAssert(cur->next != nullptr || cur == lastEntry);
         cur = cur->next;
     }
+    (void)i;
     CPLAssert(i == currentSize);
 }
 #endif
@@ -1133,6 +1134,17 @@ GDALRasterBand* GDALProxyPoolRasterBand::RefUnderlyingRasterBand(bool bForceOpen
     if (poBand == nullptr)
     {
         (cpl::down_cast<GDALProxyPoolDataset*>(poDS))->UnrefUnderlyingDataset(poUnderlyingDataset);
+    }
+    else
+    if(nBlockXSize <= 0 || nBlockYSize <= 0)
+    {
+        // Here we try to load nBlockXSize&nBlockYSize from underlying band
+        // but we must guarantee that we will not access directly to
+        // nBlockXSize/nBlockYSize before RefUnderlyingRasterBand() is called
+        int nSrcBlockXSize, nSrcBlockYSize;
+        poBand->GetBlockSize(&nSrcBlockXSize, &nSrcBlockYSize);
+        nBlockXSize = nSrcBlockXSize;
+        nBlockYSize = nSrcBlockYSize;
     }
 
     return poBand;

@@ -105,6 +105,10 @@ void CPL_STDCALL GDALAllRegister()
     GDALRegister_ELAS();
 #endif
 
+#ifdef FRMT_esric
+    GDALRegister_ESRIC();
+#endif
+
 #ifdef FRMT_aigrid
 //    GDALRegister_AIGrid2();
     GDALRegister_AIGrid();
@@ -113,6 +117,7 @@ void CPL_STDCALL GDALAllRegister()
 #ifdef FRMT_aaigrid
     GDALRegister_AAIGrid();
     GDALRegister_GRASSASCIIGrid();
+    GDALRegister_ISG();
 #endif
 
 #ifdef FRMT_sdts
@@ -308,10 +313,6 @@ void CPL_STDCALL GDALAllRegister()
 
 #ifdef FRMT_wms
     GDALRegister_WMS();
-#endif
-
-#ifdef FRMT_sde
-    GDALRegister_SDE();
 #endif
 
 #ifdef FRMT_msgn
@@ -582,6 +583,22 @@ void CPL_STDCALL GDALAllRegister()
     GDALRegister_SIGDEM();
 #endif
 
+#ifdef FRMT_exr
+    GDALRegister_EXR();
+#endif
+
+#ifdef FRMT_heif
+    GDALRegister_HEIF();
+#endif
+
+#ifdef FRMT_tga
+    GDALRegister_TGA();
+#endif
+
+#ifdef FRMT_ogcapi
+    GDALRegister_OGCAPI();
+#endif
+
     // NOTE: you need to generally your own driver before that line.
 
 /* -------------------------------------------------------------------- */
@@ -612,6 +629,8 @@ void CPL_STDCALL GDALAllRegister()
 #ifdef FRMT_wcs
     GDALRegister_HTTP();
 #endif
+
+    GetGDALDriverManager()->AutoLoadPythonDrivers();
 
 /* -------------------------------------------------------------------- */
 /*      Deregister any drivers explicitly marked as suppressed by the   */

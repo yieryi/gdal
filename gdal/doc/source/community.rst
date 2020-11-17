@@ -5,11 +5,11 @@ Community
 ================================================================================
 
 GDAL's community interacts through `Mailing List`_, `GitHub`_, and
-`IRC`_.  Please feel welcome to ask questions and participate in all of the
+`Chat`_.  Please feel welcome to ask questions and participate in all of the
 venues.  The `Mailing List`_ communication channel is for general questions,
 development discussion, and feedback. The `GitHub`_ communication channel is
-for development activities, bug reports, and testing. The `IRC`_
-channel is for real-time chat activities such as meetings and interactive
+for development activities, bug reports, and testing. The `Chat`_
+room is for real-time chat activities such as meetings and interactive
 debugging sessions.
 
 Mailing List
@@ -34,24 +34,86 @@ answering questions.
 
 
 
-IRC
----
+Chat
+----
 
-You can find some GDAL developers on IRC on #gdal at `Freenode`_. This mechanism
-is usually reserved for active meetings and other outreach with the community.
+You can find some GDAL developers in the IRC channel #gdal on `Freenode`_
+which is bridged to a `#gdal:osgeo.org`_ Matrix room.
+This mechanism is usually reserved for active meetings and other outreach
+with the community.
 The `Mailing List`_ and `GitHub`_ avenues are going to be more productive
 communication channels in most situations.
+
+.. note:: the Freenode channel only accepts messages from registered
+          users, so make sure to complete that step. Instructions can be
+          found on https://wiki.osgeo.org/wiki/Matrix for doing it from
+          the Matrix side and https://freenode.net/kb/answer/registration
+          for doing it from the IRC side (if you don't use Matrix)
 
 
 .. _`git`: https://en.wikipedia.org/wiki/Git_(software)
 .. _`Freenode`: http://freenode.net
+.. _`#gdal:osgeo.org`: http://matrix.to/#/#gdal:osgeo.org
 
 Conference
 ----------
 
-.. image:: ../images/foss4g2019.png
-   :alt:     FOSS4G 2019
-   :target:  https://2019.foss4g.org/
+.. warning:: FOSS4G 2020 has unfortunately been canceled.
 
-`FOSS4G 2019 <https://2019.foss4g.org/>`_ is the leading annual conference for free and open source geospatial software. It will include presentations related to GDAL/OGR, and some of the GDAL/OGR development community will be attending. It is the event for those interested in GDAL/OGR, other FOSS geospatial technologies and the community around them. The conference will be held in Bucharest, Romania, August 26th - August 30th, 2019.
+.. image:: ../images/foss4g2020.png
+   :alt:     FOSS4G 2020
+   :target:  https://2020.foss4g.org/
 
+`FOSS4G 2020 <https://2020.foss4g.org/>`_ is the leading annual conference for free and open source geospatial software. It will include presentations related to GDAL/OGR, and some of the GDAL/OGR development community will be attending. It is the event for those interested in GDAL/OGR, other FOSS geospatial technologies and the community around them. The conference will be held in Calgary, Canada, August 24th - August 29th, 2020.
+
+
+Governance and Community Participation
+--------------------------------------
+
+OSGeo Project Membership
+++++++++++++++++++++++++
+
+Originally, GDAL has been lead by Frank Warmerdam, the original author of much
+of GDAL/OGR, though with contributions and input from a variety of people.
+As of February 2006 GDAL/OGR became a founding project of the
+`Open Source Geospatial Foundation (OSGeo) <https://www.osgeo.org/>`_
+and began a transition to a more community oriented governance
+model - in keeping with OSGeo expectations.
+
+Membership as an OSGeo project provides assurances that a variety of best practices
+are being employed by the GDAL/OGR project, and that users and contributors can be
+assured of responsible project operation and continuity of the project. In particular:
+
+- A consensus oriented Project Management Committee will be in charge of the project.
+- Project source code and contributions will be vetted to ensure code is properly
+  made available, protecting contributors and users of GDAL/OGR.
+- Part of the systems infrastructure used by the project is provided by the foundation,
+  with responsible backup and redundancy to minimize disruptions.
+
+.. _psc:
+
+Project Steering Committee
+++++++++++++++++++++++++++
+
+As of April 2006 (following the GDAL/OGR 1.3.2 release) the project has been
+placed in the hands of a Project Steering Committee. This project steering
+committee operates under the rules of :ref:`rfc-1`, and is overall responsible for
+decisions related to the GDAL/OGR project. The current members are:
+
+- Frank Warmerdam
+- Daniel Morissette
+- Howard Butler
+- Tamas Szekeres
+- Even Rouault (chair)
+- Jukka Rahkonen
+- Kurt Schwehr
+- Norman Barker
+- Sean Gillies
+- Mateusz Łoskot
+
+Past members:
+
+- Andrey Kiselev (retired in 2019)
+
+Note that discussion of proposals to the PSC take place on gdal-dev, and input
+from all subscribers is welcome. A :ref:`list of past RFC <rfclist>` is available for review.

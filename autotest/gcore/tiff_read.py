@@ -624,7 +624,7 @@ def test_tiff_ProjectedCSTypeGeoKey_only():
 def test_tiff_GTModelTypeGeoKey_only():
 
     ds = gdal.Open('data/GTModelTypeGeoKey_only.tif')
-    assert ds.GetProjectionRef().find('LOCAL_CS["unnamed"]') == 0
+    assert ds.GetProjectionRef() in ('LOCAL_CS["unnamed"]', 'LOCAL_CS["unnamed",UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]')
     ds = None
 
 ###############################################################################
@@ -801,6 +801,33 @@ def test_tiff_read_geomatrix():
         'did not get expected geotransform with GTIFF_POINT_GEO_IGNORE TRUE'
 
     gdal.SetConfigOption('GTIFF_POINT_GEO_IGNORE', None)
+
+###############################################################################
+# Test reading a GeoTIFF file with tiepoints in PixelIsPoint format.
+
+
+def test_tiff_read_tiepoints_pixelispoint():
+
+    ds = gdal.Open('data/byte_gcp_pixelispoint.tif')
+    assert ds.GetMetadataItem('AREA_OR_POINT') == 'Point'
+    assert ds.GetGCPCount() == 4
+    gcp = ds.GetGCPs()[0]
+    assert (gcp.GCPPixel == pytest.approx(0.5, abs=1e-5) and \
+       gcp.GCPLine == pytest.approx(0.5, abs=1e-5) and \
+       gcp.GCPX == pytest.approx(-180, abs=1e-5) and \
+       gcp.GCPY == pytest.approx(90, abs=1e-5) and \
+       gcp.GCPZ == pytest.approx(0, abs=1e-5))
+
+    with gdaltest.config_option('GTIFF_POINT_GEO_IGNORE', 'YES'):
+        ds = gdal.Open('data/byte_gcp_pixelispoint.tif')
+        assert ds.GetMetadataItem('AREA_OR_POINT') == 'Point'
+        assert ds.GetGCPCount() == 4
+        gcp = ds.GetGCPs()[0]
+        assert (gcp.GCPPixel == pytest.approx(0, abs=1e-5) and \
+        gcp.GCPLine == pytest.approx(0, abs=1e-5) and \
+        gcp.GCPX == pytest.approx(-180, abs=1e-5) and \
+        gcp.GCPY == pytest.approx(90, abs=1e-5) and \
+        gcp.GCPZ == pytest.approx(0, abs=1e-5))
 
 ###############################################################################
 # Test that we don't crash when reading a TIFF with corrupted GeoTIFF tags
@@ -2234,7 +2261,9 @@ def test_tiff_read_nogeoref():
                 print('Expected ' + str(expected_gt))
                 pytest.fail('Iteration %d, did not get expected gt for %s,copy_pam=%s,copy_worldfile=%s,copy_tabfile=%s' % (iteration, config_option_value, str(copy_pam), str(copy_worldfile), str(copy_tabfile)))
 
-            if (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
+            if expected_srs == 'LOCAL_CS["PAM"]' and srs_wkt == 'LOCAL_CS["PAM",UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]':
+                pass # ok
+            elif (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
                 print('Got ' + srs_wkt)
                 print('Expected ' + expected_srs)
                 pytest.fail('Iteration %d, did not get expected SRS for %s,copy_pam=%s,copy_worldfile=%s,copy_tabfile=%s' % (iteration, config_option_value, str(copy_pam), str(copy_worldfile), str(copy_tabfile)))
@@ -2292,7 +2321,9 @@ def test_tiff_read_inconsistent_georef():
                 print('Expected ' + str(expected_gt))
                 pytest.fail('Iteration %d, did not get expected gt for %s,copy_pam=%s,copy_worldfile=%s,copy_tabfile=%s' % (iteration, config_option_value, str(copy_pam), str(copy_worldfile), str(copy_tabfile)))
 
-            if (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
+            if expected_srs == 'LOCAL_CS["PAM"]' and srs_wkt == 'LOCAL_CS["PAM",UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]':
+                pass # ok
+            elif (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
                 print('Got ' + srs_wkt)
                 print('Expected ' + expected_srs)
                 pytest.fail('Iteration %d, did not get expected SRS for %s,copy_pam=%s,copy_worldfile=%s,copy_tabfile=%s' % (iteration, config_option_value, str(copy_pam), str(copy_worldfile), str(copy_tabfile)))
@@ -2340,7 +2371,9 @@ def test_tiff_read_gcp_internal_and_auxxml():
                 print('Expected ' + str(expected_gcp_count))
                 pytest.fail('Iteration %d, did not get expected gcp count for %s,copy_pam=%s' % (iteration, config_option_value, str(copy_pam)))
 
-            if (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
+            if expected_srs == 'LOCAL_CS["PAM"]' and srs_wkt == 'LOCAL_CS["PAM",UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]':
+                pass # ok
+            elif (expected_srs == '' and srs_wkt != '') or (expected_srs != '' and expected_srs not in srs_wkt):
                 print('Got ' + srs_wkt)
                 print('Expected ' + expected_srs)
                 pytest.fail('Iteration %d, did not get expected SRS for %s,copy_pam=%s' % (iteration, config_option_value, str(copy_pam)))
@@ -2898,8 +2931,12 @@ def test_tiff_read_progressive_jpeg_denial_of_service():
     # Should error out with 'JPEGPreDecode:Reading this strip would require
     # libjpeg to allocate at least...'
     gdal.ErrorReset()
-    ds = gdal.Open('/vsizip/data/eofloop_valid_huff.tif.zip')
     with gdaltest.error_handler():
+        os.environ['JPEGMEM'] = '10M'
+        os.environ['LIBTIFF_JPEG_MAX_ALLOWED_SCAN_NUMBER'] = '1000'
+        ds = gdal.Open('/vsizip/data/eofloop_valid_huff.tif.zip')
+        del os.environ['LIBTIFF_JPEG_MAX_ALLOWED_SCAN_NUMBER']
+        del os.environ['JPEGMEM']
         cs = ds.GetRasterBand(1).Checksum()
         assert cs == 0 and gdal.GetLastErrorMsg() != ''
 
@@ -2912,9 +2949,8 @@ def test_tiff_read_progressive_jpeg_denial_of_service():
         cs = ds.GetRasterBand(1).Checksum()
         del os.environ['LIBTIFF_ALLOW_LARGE_LIBJPEG_MEM_ALLOC']
         del os.environ['LIBTIFF_JPEG_MAX_ALLOWED_SCAN_NUMBER']
-        assert gdal.GetLastErrorMsg() != ''
+        assert cs == 0 and gdal.GetLastErrorMsg() != ''
 
-    
 
 ###############################################################################
 # Test reading old-style LZW
@@ -3321,9 +3357,8 @@ def test_tiff_read_cog_with_mask_vsicurl():
     try:
         src_ds = gdal.GetDriverByName('GTIFF').Create(in_filename, 1024, 1024, options = ['BIGTIFF=YES', 'TILED=YES', 'BLOCKXSIZE=16', 'BLOCKYSIZE=16', 'SPARSE_OK=YES'])
         src_ds.BuildOverviews('NEAR', [256])
-        with gdaltest.config_option('GDAL_TIFF_INTERNAL_MASK', 'YES'):
+        with gdaltest.config_options({'GDAL_TIFF_INTERNAL_MASK': 'YES', 'GDAL_TIFF_DEFLATE_SUBCODEC': 'ZLIB'}):
             src_ds.CreateMaskBand(gdal.GMF_PER_DATASET)
-        with gdaltest.config_option('GDAL_TIFF_INTERNAL_MASK', 'YES'):
             gdal.GetDriverByName('GTIFF').CreateCopy(cog_filename, src_ds, options = ['BIGTIFF=YES', 'TILED=YES', 'BLOCKXSIZE=16', 'BLOCKYSIZE=16', 'COPY_SRC_OVERVIEWS=YES', 'COMPRESS=LZW'])
 
         filesize = gdal.VSIStatL(cog_filename).size
@@ -3401,3 +3436,74 @@ def test_tiff_read_cog_with_mask_vsicurl():
 
         gdal.GetDriverByName('GTIFF').Delete(in_filename)
         gdal.GetDriverByName('GTIFF').Delete(cog_filename)
+
+###############################################################################
+# Check that GetMetadataDomainList() works properly
+
+
+def test_tiff_GetMetadataDomainList():
+
+    ds = gdal.Open('data/byte.tif')
+    mdd1_set = set([x for x in ds.GetMetadataDomainList()])
+    assert mdd1_set == set(['', 'DERIVED_SUBDATASETS', 'IMAGE_STRUCTURE'])
+    mdd2_set = set([x for x in ds.GetMetadataDomainList()])
+    assert mdd1_set == mdd2_set
+
+
+###############################################################################
+# Test reading a file with SLONG8 data type for StripOffsets
+
+
+def test_tiff_read_bigtiff_invalid_slong8_for_stripoffsets():
+
+    if not check_libtiff_internal_or_at_least(4, 1, 1):
+        pytest.skip()
+
+    with gdaltest.error_handler():
+        ds = gdal.Open('data/byte_bigtiff_invalid_slong8_for_stripoffsets.tif')
+    cs = ds.GetRasterBand(1).Checksum()
+    assert cs == 4672
+
+
+###############################################################################
+# Test reading a file with a single band, and WhitePoint and PrimaryChromaticities
+# tags
+
+
+def test_tiff_read_tiff_single_band_with_whitepoint_primarychroma_tags():
+
+    ds = gdal.Open('data/tiff_single_band_with_whitepoint_primarychroma_tags.tif')
+    # Check that it doesn't crash. We could perhaps return something more
+    # useful
+    assert ds.GetMetadata('COLOR_PROFILE') == {}
+
+
+###############################################################################
+# Test that subdataset names for Geodetic TIFF grids (GTG)
+# (https://proj.org/specifications/geodetictiffgrids.html)
+# include the grid_name
+
+
+def test_tiff_read_geodetic_tiff_grid():
+
+    ds = gdal.Open('data/test_hgrid_with_subgrid.tif')
+    assert ds.GetSubDatasets()[0][1] == 'Page 1 (10P x 10L x 2B): CAwest'
+
+
+
+###############################################################################
+# Test fix for https://github.com/OSGeo/gdal/issues/2903
+# related to precomposed vs decomposed UTF-8 filenames on MacOSX
+
+def test_tiff_read_utf8_encoding_issue_2903():
+
+    precomposed_utf8 = b'\xc3\xa4'.decode('utf-8')
+    tmp_tif_filename = 'tmp/%s.tif' % precomposed_utf8
+    tmp_tfw_filename = 'tmp/%s.tfw' % precomposed_utf8
+    open(tmp_tif_filename, 'wb').write(open('data/byte_nogeoref.tif', 'rb').read())
+    open(tmp_tfw_filename, 'wb').write(open('data/byte_nogeoref.tfw', 'rb').read())
+    ds = gdal.Open(tmp_tif_filename)
+    assert ds.GetGeoTransform()[0] != 0
+    ds = None
+    os.unlink(tmp_tif_filename)
+    os.unlink(tmp_tfw_filename)

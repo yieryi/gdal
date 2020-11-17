@@ -627,6 +627,67 @@ def test_ogr_geom_transform():
         geom.ExportToWkt()
 
 ###############################################################################
+# Test ogr.GeomTransformer()
+
+
+def test_ogr_geomtransfomer_default():
+
+    if not ogrtest.have_geos():
+        pytest.skip()
+
+    src = osr.SpatialReference()
+    src.ImportFromEPSG(32660)
+
+    dst = osr.SpatialReference()
+    dst.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    dst.ImportFromEPSG(4326)
+
+    ct = osr.CoordinateTransformation(src, dst)
+    geom = ogr.CreateGeometryFromWkt('LINESTRING(832864.275023695 0,835092.849076364 0)')
+    transformer = ogr.GeomTransformer(ct)
+
+    geom_dst = transformer.Transform(geom)
+    assert geom_dst.ExportToWkt() == 'MULTILINESTRING ((179.99 0.0,180 0),(-180 0,-179.99 0.0))'
+
+###############################################################################
+# Test ogr.GeomTransformer()
+
+
+def test_ogr_geomtransfomer_wrapdateline_with_ct():
+
+    if not ogrtest.have_geos():
+        pytest.skip()
+
+    src = osr.SpatialReference()
+    src.ImportFromEPSG(3857)
+
+    dst = osr.SpatialReference()
+    dst.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    dst.ImportFromEPSG(4326)
+
+    ct = osr.CoordinateTransformation(src, dst)
+    geom = ogr.CreateGeometryFromWkt('LINESTRING(20026376.3937099 0,-20026376.3937099 0)')
+    transformer = ogr.GeomTransformer(ct, ['WRAPDATELINE=YES'])
+
+    geom_dst = geom.Transform(transformer)
+    assert geom_dst.ExportToWkt() == 'MULTILINESTRING ((179.9 0.0,180 0),(-180 0,-179.9 0.0))'
+
+###############################################################################
+# Test ogr.GeomTransformer()
+
+
+def test_ogr_geomtransfomer_wrapdateline_no_ct():
+
+    if not ogrtest.have_geos():
+        pytest.skip()
+    geom = ogr.CreateGeometryFromWkt('LINESTRING(-179 0,179 0)')
+    transformer = ogr.GeomTransformer(None, ['WRAPDATELINE=YES'])
+
+    geom_dst = geom.Transform(transformer)
+    assert geom_dst.ExportToWkt() == 'MULTILINESTRING ((-179 0,-180 0),(180 0,179 0))'
+
+
+###############################################################################
 # Test CloseRings()
 
 
@@ -659,9 +720,9 @@ def test_ogr_geom_segmentize():
     assert geom.ExportToWkt() == 'LINESTRING (0 0 1,0 1 1,0 2 1,0 3 1,0 4 1,0 5 1,0 6 1,0 7 1,0 8 1,0 9 1,0 10 1)'
 
     # 2D + M
-    geom = ogr.CreateGeometryFromWkt('LINESTRING M(0 0 1,0 10 1)')
+    geom = ogr.CreateGeometryFromWkt('LINESTRING M(0 0 1,0 10 2)')
     geom.Segmentize(5)
-    assert geom.ExportToIsoWkt() == 'LINESTRING M (0 0 1,0 5 1,0 10 1)'
+    assert geom.ExportToIsoWkt() == 'LINESTRING M (0 0 1,0 5 2,0 10 2)'
 
     # 2D + ZM
     geom = ogr.CreateGeometryFromWkt('LINESTRING ZM(0 0 1 2,0 10 1 2)')
@@ -817,18 +878,15 @@ def test_ogr_geom_linestring_limits():
     gdal.PopErrorHandler()
     assert gdal.GetLastErrorType() != 0
 
-    if False:  # pylint: disable=using-constant-test
-        gdal.ErrorReset()
-        gdal.PushErrorHandler('CPLQuietErrorHandler')
+    gdal.ErrorReset()
+    with gdaltest.error_handler():
         geom.SetPoint(2147000000, 5, 6, 7)
-        gdal.PopErrorHandler()
-        assert gdal.GetLastErrorType() != 0
+    assert gdal.GetLastErrorType() != 0
 
-        gdal.ErrorReset()
-        gdal.PushErrorHandler('CPLQuietErrorHandler')
+    gdal.ErrorReset()
+    with gdaltest.error_handler():
         geom.SetPoint_2D(2147000000, 5, 6)
-        gdal.PopErrorHandler()
-        assert gdal.GetLastErrorType() != 0
+    assert gdal.GetLastErrorType() != 0
 
     geom = ogr.CreateGeometryFromWkt('LINESTRING(0 0)')
     assert geom.Length() == 0
@@ -2559,7 +2617,8 @@ def test_ogr_geom_getcurvegeometry():
         g1 = ogr.CreateGeometryFromWkt('CIRCULARSTRING (0 0,1 1,2 0))')
         g2 = ogr.CreateGeometryFromWkt('CIRCULARSTRING (2 0,1 -1,0 0))')
         g3 = g1.Union(g2)
-        assert g3.ExportToWkt() == 'MULTICURVE (CIRCULARSTRING (0 0,1 1,2 0),CIRCULARSTRING (2 0,1 -1,0 0))'
+        assert g3.ExportToWkt() == 'MULTICURVE (CIRCULARSTRING (0 0,1 1,2 0),CIRCULARSTRING (2 0,1 -1,0 0))' or \
+               g3.ExportToWkt() == 'MULTICURVE (CIRCULARSTRING (2 0,1 -1,0 0),CIRCULARSTRING (0 0,1 1,2 0))'  # GEOS OverlayNG
 
         g1 = ogr.CreateGeometryFromWkt('POINT(1 2)')
         g1 = g1.Buffer(0.5)
@@ -3266,6 +3325,14 @@ def test_ogr_geom_force_polygonzm_to_linestring():
 ###############################################################################
 
 
+def test_ogr_geom_force_polygonzm_to_multilinestring():
+    g = ogr.CreateGeometryFromWkt('POLYGON ZM ((0 0 10 20,0 1 30 40,1 1 50 60,0 0 10 70))')
+    wkt = ogr.ForceToMultiLineString(g).ExportToIsoWkt()
+    assert wkt == 'MULTILINESTRING ZM ((0 0 10 20,0 1 30 40,1 1 50 60,0 0 10 70))'
+
+###############################################################################
+
+
 def test_ogr_geom_create_from_wkt_polyhedrasurface():
     g = ogr.CreateGeometryFromWkt('POLYHEDRALSURFACE (((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)))')
     assert g.ExportToWkt() == 'POLYHEDRALSURFACE Z (((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)))'
@@ -3298,11 +3365,51 @@ def test_ogr_geom_makevalid():
     # Invalid
     g = ogr.CreateGeometryFromWkt('POLYGON ((0 0,10 10,0 10,10 0,0 0))')
     g = g.MakeValid()
-    assert g is None or g.ExportToWkt() == 'MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))'
+    assert g is None or ogrtest.check_feature_geometry(g, 'MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))') == 0, g.ExportToWkt()
 
     # Invalid
     g = ogr.CreateGeometryFromWkt('CURVEPOLYGON ((0 0,10 10,0 10,10 0,0 0))')
     g = g.MakeValid()
-    assert g is None or g.ExportToWkt() == 'MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))'
+    assert g is None or ogrtest.check_feature_geometry(g, 'MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))') == 0, g.ExportToWkt()
 
     return 'success'
+
+###############################################################################
+
+
+def test_ogr_geom_force_multipolygon_z_to_compound_curve():
+
+    g = ogr.CreateGeometryFromWkt('MULTIPOLYGON Z (((0 0 0,0 1 0,1 1 0,0 0 0)))')
+    g = ogr.ForceTo(g, ogr.wkbCompoundCurve)
+    assert g.ExportToIsoWkt() == 'COMPOUNDCURVE Z ((0 0 0,0 1 0,1 1 0,0 0 0))'
+
+###############################################################################
+
+@pytest.mark.parametrize(
+    'input_wkt,expected_wkt',
+    [
+        ('POINT EMPTY', 'POINT EMPTY'),
+        ('POINT (1 2)', 'POINT (1 2)'),
+        ('POINT Z (1 2 3)', 'POINT Z (1 2 3)'),
+        ('LINESTRING (1 2,3 4)', 'LINESTRING (1 2,3 4)'),
+        ('POLYGON ((0 0,0 1,1 1,0 0))', 'POLYGON ((0 0,0 1,1 1,0 0))'),
+        ('GEOMETRYCOLLECTION EMPTY', 'GEOMETRYCOLLECTION EMPTY'),
+        ('GEOMETRYCOLLECTION Z (POINT Z (1 2 3))', 'POINT Z (1 2 3)'),
+        ('GEOMETRYCOLLECTION (LINESTRING (1 2,3 4))', 'LINESTRING (1 2,3 4)'),
+        ('GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,0 0)))', 'POLYGON ((0 0,0 1,1 1,0 0))'),
+        ('GEOMETRYCOLLECTION (LINESTRING (1 2,3 4),POINT (1 2))', 'LINESTRING (1 2,3 4)'),
+        ('GEOMETRYCOLLECTION (POINT (1 2),LINESTRING (1 2,3 4))', 'LINESTRING (1 2,3 4)'),
+        ('GEOMETRYCOLLECTION (LINESTRING (1 2,3 4),LINESTRING (5 6,7 8))', 'MULTILINESTRING ((1 2,3 4),(5 6,7 8))'),
+        ('GEOMETRYCOLLECTION (POINT (1 2),POLYGON ((0 0,0 1,1 1,0 0)))', 'POLYGON ((0 0,0 1,1 1,0 0))'),
+        ('GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,0 0)),POLYGON ((10 0,10 1,11 1,10 0)))', 'MULTIPOLYGON (((0 0,0 1,1 1,0 0)),((10 0,10 1,11 1,10 0)))'),
+        ('GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,0 0)),MULTIPOLYGON (((10 0,10 1,11 1,10 0))))', 'MULTIPOLYGON (((0 0,0 1,1 1,0 0)),((10 0,10 1,11 1,10 0)))'),
+        ('GEOMETRYCOLLECTION (CIRCULARSTRING (0 0,1 1,2 0),LINESTRING(3 4,5 6))', 'MULTICURVE (CIRCULARSTRING (0 0,1 1,2 0),(3 4,5 6))'),
+        ('GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,0 0)),CURVEPOLYGON ((10 0,10 1,11 1,10 0)))', 'MULTISURFACE (((0 0,0 1,1 1,0 0)),CURVEPOLYGON ((10 0,10 1,11 1,10 0)))'),
+        ('GEOMETRYCOLLECTION (MULTIPOLYGON (((0 0,0 1,1 1,0 0)),((10 0,10 1,11 1,10 0))),POINT (1 2))', 'MULTIPOLYGON (((0 0,0 1,1 1,0 0)),((10 0,10 1,11 1,10 0)))'),
+    ]
+)
+def test_ogr_geom_removeLowerDimensionSubGeoms(input_wkt, expected_wkt):
+
+    g = ogr.CreateGeometryFromWkt(input_wkt)
+    g = g.RemoveLowerDimensionSubGeoms()
+    assert g.ExportToIsoWkt() == expected_wkt

@@ -226,6 +226,7 @@ class CPL_DLL OGRSpatialReference
                                 double *padfPrjParams, long iDatum,
                                 int nUSGSAngleFormat = USGS_ANGLE_PACKEDDMS );
     OGRErr      importFromPanorama( long, long, long, double* );
+    OGRErr      importVertCSFromPanorama( int );
     OGRErr      importFromOzi( const char * const* papszLines );
     OGRErr      importFromWMSAUTO( const char *pszAutoDef );
     OGRErr      importFromXML( const char * );
@@ -246,6 +247,9 @@ class CPL_DLL OGRSpatialReference
 
     OGRErr      Validate() const;
     OGRErr      StripVertical();
+
+    bool        StripTOWGS84IfKnownDatumAndAllowed();
+    bool        StripTOWGS84IfKnownDatum();
 
     int         EPSGTreatsAsLatLong() const;
     int         EPSGTreatsAsNorthingEasting() const;
@@ -289,7 +293,11 @@ class CPL_DLL OGRSpatialReference
                                       const char *pszUnitAuthority = nullptr,
                                       const char *pszUnitCode = nullptr);
 
-    double      GetLinearUnits( char ** ) const CPL_WARN_DEPRECATED("Use GetLinearUnits(const char**) instead");
+    double      GetLinearUnits( char ** ) const
+/*! @cond Doxygen_Suppress */
+        CPL_WARN_DEPRECATED("Use GetLinearUnits(const char**) instead")
+/*! @endcond */
+        ;
     double      GetLinearUnits( const char ** = nullptr ) const;
 /*! @cond Doxygen_Suppress */
     double      GetLinearUnits( std::nullptr_t ) const
@@ -298,7 +306,10 @@ class CPL_DLL OGRSpatialReference
 
     double      GetTargetLinearUnits( const char *pszTargetKey,
                                       char ** ppszRetName ) const
-            CPL_WARN_DEPRECATED("Use GetTargetLinearUnits(const char*, const char**)");
+/*! @cond Doxygen_Suppress */
+            CPL_WARN_DEPRECATED("Use GetTargetLinearUnits(const char*, const char**)")
+/*! @endcond */
+            ;
     double      GetTargetLinearUnits( const char *pszTargetKey,
                                       const char ** ppszRetName = nullptr ) const;
 /*! @cond Doxygen_Suppress */
@@ -307,14 +318,22 @@ class CPL_DLL OGRSpatialReference
 /*! @endcond */
 
     OGRErr      SetAngularUnits( const char *pszName, double dfInRadians );
-    double      GetAngularUnits( char ** ) const CPL_WARN_DEPRECATED("Use GetAngularUnits(const char**) instead");
+    double      GetAngularUnits( char ** ) const
+/*! @cond Doxygen_Suppress */
+        CPL_WARN_DEPRECATED("Use GetAngularUnits(const char**) instead")
+/*! @endcond */
+        ;
     double      GetAngularUnits( const char ** = nullptr ) const;
 /*! @cond Doxygen_Suppress */
     double      GetAngularUnits( std::nullptr_t ) const
         { return GetAngularUnits( static_cast<const char**>(nullptr) ); }
 /*! @endcond */
 
-    double      GetPrimeMeridian( char ** ) const CPL_WARN_DEPRECATED("Use GetPrimeMeridian(const char**) instead");
+    double      GetPrimeMeridian( char ** ) const
+/*! @cond Doxygen_Suppress */
+        CPL_WARN_DEPRECATED("Use GetPrimeMeridian(const char**) instead")
+/*! @endcond */
+        ;
     double      GetPrimeMeridian( const char ** = nullptr ) const;
 /*! @cond Doxygen_Suppress */
     double      GetPrimeMeridian( std::nullptr_t ) const
@@ -323,6 +342,7 @@ class CPL_DLL OGRSpatialReference
 
     bool        IsEmpty() const;
     int         IsGeographic() const;
+    int         IsDerivedGeographic() const;
     int         IsProjected() const;
     int         IsGeocentric() const;
     int         IsLocal() const;
@@ -358,12 +378,18 @@ class CPL_DLL OGRSpatialReference
                                const OGRSpatialReference *poHorizSRS,
                                const OGRSpatialReference *poVertSRS );
 
+    // cppcheck-suppress functionStatic
+    OGRErr      PromoteTo3D( const char* pszName );
+    // cppcheck-suppress functionStatic
+    OGRErr      DemoteTo2D( const char* pszName );
+
     OGRErr      SetFromUserInput( const char * );
 
     OGRErr      SetTOWGS84( double, double, double,
                             double = 0.0, double = 0.0, double = 0.0,
                             double = 0.0 );
     OGRErr      GetTOWGS84( double *padfCoef, int nCoeff = 7 ) const;
+    OGRErr      AddGuessedTOWGS84();
 
     double      GetSemiMajor( OGRErr * = nullptr ) const;
     double      GetSemiMinor( OGRErr * = nullptr ) const;
@@ -636,6 +662,22 @@ class CPL_DLL OGRSpatialReference
     /** Spherical, Cross-track, Height */
     OGRErr      SetSCH( double dfPegLat, double dfPegLong,
                         double dfPegHeading, double dfPegHgt);
+
+    /** Vertical Perspective / Near-sided Perspective */
+    OGRErr      SetVerticalPerspective( double dfTopoOriginLat,
+                                        double dfTopoOriginLon,
+                                        double dfTopoOriginHeight,
+                                        double dfViewPointHeight,
+                                        double dfFalseEasting,
+                                        double dfFalseNorthing);
+
+    /** Pole rotation (GRIB convention) */
+    OGRErr      SetDerivedGeogCRSWithPoleRotationGRIBConvention(
+                                               const char* pszCRSName,
+                                               double dfSouthPoleLat,
+                                               double dfSouthPoleLon,
+                                               double dfAxisRotation );
+
     /** State Plane */
     OGRErr      SetStatePlane( int nZone, int bNAD83 = TRUE,
                                const char *pszOverrideUnitName = nullptr,
@@ -761,6 +803,11 @@ public:
      */
     static inline OGRCoordinateTransformation* FromHandle(OGRCoordinateTransformationH hCT)
         { return reinterpret_cast<OGRCoordinateTransformation*>(hCT); }
+
+    /** Clone
+     * @since GDAL 3.1
+     */
+    virtual OGRCoordinateTransformation* Clone() const = 0;
 };
 
 OGRCoordinateTransformation CPL_DLL *
@@ -785,6 +832,8 @@ private:
 
 public:
     OGRCoordinateTransformationOptions();
+    OGRCoordinateTransformationOptions(const OGRCoordinateTransformationOptions&);
+    OGRCoordinateTransformationOptions& operator= (const OGRCoordinateTransformationOptions&);
     ~OGRCoordinateTransformationOptions();
 
     bool SetAreaOfInterest(double dfWestLongitudeDeg,

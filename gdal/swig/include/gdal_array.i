@@ -63,6 +63,19 @@
 typedef int CPLErr;
 typedef int GDALRIOResampleAlg;
 
+%typemap(check) GDALRIOResampleAlg
+{
+    // %typemap(check) GDALRIOResampleAlg
+    // This check is a bit too late, since $1 has already been cast
+    // to GDALRIOResampleAlg, so we are a bit in undefined behavior land,
+    // but compilers should hopefully do the right thing
+    if( static_cast<int>($1) < 0 ||
+        static_cast<int>($1) > static_cast<int>(GRIORA_LAST) )
+    {
+        SWIG_exception(SWIG_ValueError, "Invalid value for resample_alg");
+    }
+}
+
 %include "python_strings.i"
 
 %{
@@ -465,7 +478,7 @@ GDALDataset* NUMPYDataset::Open( PyArrayObject *psArray, bool binterleave )
 
     poDS->psArray = psArray;
 
-    poDS->eAccess = GA_ReadOnly;
+    poDS->eAccess = (PyArray_FLAGS(psArray) & NPY_ARRAY_WRITEABLE) ? GA_Update : GA_ReadOnly;
 
 /* -------------------------------------------------------------------- */
 /*      Add a reference to the array.                                   */
@@ -781,7 +794,7 @@ retStringAndCPLFree* GetArrayFilename(PyArrayObject *psArray)
 
 %feature( "kwargs" ) DatasetIONumPy;
 %inline %{
-  CPLErr DatasetIONumPy( GDALDatasetShadow* ds, int bWrite, int xoff, int yoff, int xsize, int ysize,
+  CPLErr DatasetIONumPy( GDALDatasetShadow* ds, int bWrite, double xoff, double yoff, double xsize, double ysize,
                          PyArrayObject *psArray,
                          int buf_type,
                          GDALRIOResampleAlg resample_alg,
@@ -831,8 +844,21 @@ retStringAndCPLFree* GetArrayFilename(PyArrayObject *psArray)
     sExtraArg.eResampleAlg = resample_alg;
     sExtraArg.pfnProgress = callback;
     sExtraArg.pProgressData = callback_data;
+    int nXOff = (int)(xoff + 0.5);
+    int nYOff = (int)(yoff + 0.5);
+    int nXSize = (int)(xsize + 0.5);
+    int nYSize = (int)(ysize + 0.5);
+    if( fabs(xoff-nXOff) > 1e-8 || fabs(yoff-nYOff) > 1e-8 ||
+        fabs(xsize-nXSize) > 1e-8 || fabs(ysize-nYSize) > 1e-8 )
+    {
+        sExtraArg.bFloatingPointWindowValidity = TRUE;
+        sExtraArg.dfXOff = xoff;
+        sExtraArg.dfYOff = yoff;
+        sExtraArg.dfXSize = xsize;
+        sExtraArg.dfYSize = ysize;
+    }
 
-    return  GDALDatasetRasterIOEx( ds, (bWrite) ? GF_Write : GF_Read, xoff, yoff, xsize, ysize,
+    return  GDALDatasetRasterIOEx( ds, (bWrite) ? GF_Write : GF_Read, nXOff, nYOff, nXSize, nYSize,
                                    PyArray_DATA(psArray), nxsize, nysize,
                                    ntype,
                                    bandsize, NULL,
@@ -1418,10 +1444,12 @@ def DatasetReadAsArray(ds, xoff=0, yoff=0, win_xsize=None, win_ysize=None, buf_o
         interleave = True
         xdim = 2
         ydim = 1
+        banddim = 0
     elif interleave == 'pixel':
         interleave = False
         xdim = 1
         ydim = 0
+        banddim = 2
     else:
         raise ValueError('Interleave should be band or pixel')
 
@@ -1469,8 +1497,8 @@ def DatasetReadAsArray(ds, xoff=0, yoff=0, win_xsize=None, win_ysize=None, buf_o
             raise ValueError('Specified buf_xsize not consistent with array shape')
         if buf_ysize is not None and buf_ysize != shape_buf_ysize:
             raise ValueError('Specified buf_ysize not consistent with array shape')
-        if buf_obj.shape[0] != ds.RasterCount:
-            raise ValueError('Array should have space for %d bands' % ds.RasterCount)
+        if buf_obj.shape[banddim] != ds.RasterCount:
+            raise ValueError('Dimension %d of array should have size %d to store bands)' % (banddim, ds.RasterCount))
 
         datatype = NumericTypeCodeToGDALTypeCode(buf_obj.dtype.type)
         if not datatype:

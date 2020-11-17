@@ -41,6 +41,8 @@
 #include "minidriver_arcgis_server.h"
 #include "minidriver_iip.h"
 #include "minidriver_mrf.h"
+#include "minidriver_ogcapimaps.h"
+#include "minidriver_ogcapicoverage.h"
 
 #include "cpl_json.h"
 
@@ -1057,13 +1059,15 @@ void GDALRegister_WMS()
     RegisterMinidriver(AGS);
     RegisterMinidriver(IIP);
     RegisterMinidriver(MRF);
+    RegisterMinidriver(OGCAPIMaps);
+    RegisterMinidriver(OGCAPICoverage);
 
     GDALDriver *poDriver = new GDALDriver();
 
     poDriver->SetDescription("WMS");
     poDriver->SetMetadataItem( GDAL_DCAP_RASTER, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME, "OGC Web Map Service" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "frmt_wms.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/raster/wms.html" );
     poDriver->SetMetadataItem( GDAL_DCAP_VIRTUALIO, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_SUBDATASETS, "YES" );
 

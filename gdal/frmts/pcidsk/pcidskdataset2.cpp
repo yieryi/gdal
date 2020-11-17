@@ -99,7 +99,7 @@ PCIDSK2Band::PCIDSK2Band( PCIDSKChannel *poChannelIn )
 
     if( poChannel->GetType() == CHN_BIT )
     {
-        SetMetadataItem( "NBITS", "1", "IMAGE_STRUCTURE" );
+        PCIDSK2Band::SetMetadataItem( "NBITS", "1", "IMAGE_STRUCTURE" );
 
         if( !STARTS_WITH_CI(poChannel->GetDescription().c_str(),
                     "Contents Not Specified") )
@@ -626,6 +626,7 @@ CPLErr PCIDSK2Band::SetMetadata( char **papszMD,
 /* -------------------------------------------------------------------- */
     CSLDestroy( papszLastMDListValue );
     papszLastMDListValue = nullptr;
+    m_oCacheMetadataItem.clear();
 
     if( GetAccess() == GA_ReadOnly )
     {
@@ -679,6 +680,7 @@ CPLErr PCIDSK2Band::SetMetadataItem( const char *pszName,
 /* -------------------------------------------------------------------- */
     CSLDestroy( papszLastMDListValue );
     papszLastMDListValue = nullptr;
+    m_oCacheMetadataItem.clear();
 
     if( GetAccess() == GA_ReadOnly )
     {
@@ -729,23 +731,27 @@ const char *PCIDSK2Band::GetMetadataItem( const char *pszName,
         return GDALPamRasterBand::GetMetadataItem( pszName, pszDomain );
 
 /* -------------------------------------------------------------------- */
-/*      Try and fetch.                                                  */
+/*      Try and fetch (use cached value if available)                   */
 /* -------------------------------------------------------------------- */
-    try
+    auto oIter = m_oCacheMetadataItem.find(pszName);
+    if( oIter == m_oCacheMetadataItem.end() )
     {
-        osLastMDValue = poChannel->GetMetadataValue( pszName );
-    }
-    catch( const PCIDSKException& ex )
-    {
-        CPLError( CE_Failure, CPLE_AppDefined,
-                  "%s", ex.what() );
-        return nullptr;
-    }
+        CPLString osValue;
+        try
+        {
+            osValue = poChannel->GetMetadataValue( pszName );
+        }
+        catch( const PCIDSKException& ex )
+        {
+            CPLError( CE_Failure, CPLE_AppDefined,
+                    "%s", ex.what() );
+            return nullptr;
+        }
 
-    if( osLastMDValue == "" )
-        return nullptr;
-
-    return osLastMDValue.c_str();
+        m_oCacheMetadataItem[pszName] = osValue;
+        oIter = m_oCacheMetadataItem.find(pszName);
+    }
+    return oIter->second.empty() ? nullptr : oIter->second.c_str();
 }
 
 /************************************************************************/
@@ -1066,6 +1072,7 @@ CPLErr PCIDSK2Dataset::SetMetadata( char **papszMD,
 /* -------------------------------------------------------------------- */
     CSLDestroy( papszLastMDListValue );
     papszLastMDListValue = nullptr;
+    m_oCacheMetadataItem.clear();
 
     if( GetAccess() == GA_ReadOnly )
     {
@@ -1118,6 +1125,7 @@ CPLErr PCIDSK2Dataset::SetMetadataItem( const char *pszName,
 /* -------------------------------------------------------------------- */
     CSLDestroy( papszLastMDListValue );
     papszLastMDListValue = nullptr;
+    m_oCacheMetadataItem.clear();
 
     if( GetAccess() == GA_ReadOnly )
     {
@@ -1166,23 +1174,27 @@ const char *PCIDSK2Dataset::GetMetadataItem( const char *pszName,
         return GDALPamDataset::GetMetadataItem( pszName, pszDomain );
 
 /* -------------------------------------------------------------------- */
-/*      Try and fetch.                                                  */
+/*      Try and fetch (use cached value if available)                   */
 /* -------------------------------------------------------------------- */
-    try
+    auto oIter = m_oCacheMetadataItem.find(pszName);
+    if( oIter == m_oCacheMetadataItem.end() )
     {
-        osLastMDValue = poFile->GetMetadataValue( pszName );
-    }
-    catch( const PCIDSKException& ex )
-    {
-        CPLError( CE_Failure, CPLE_AppDefined,
-                  "%s", ex.what() );
-        return nullptr;
-    }
+        CPLString osValue;
+        try
+        {
+            osValue = poFile->GetMetadataValue( pszName );
+        }
+        catch( const PCIDSKException& ex )
+        {
+            CPLError( CE_Failure, CPLE_AppDefined,
+                    "%s", ex.what() );
+            return nullptr;
+        }
 
-    if( osLastMDValue == "" )
-        return nullptr;
-
-    return osLastMDValue.c_str();
+        m_oCacheMetadataItem[pszName] = osValue;
+        oIter = m_oCacheMetadataItem.find(pszName);
+    }
+    return oIter->second.empty() ? nullptr : oIter->second.c_str();
 }
 
 /************************************************************************/
@@ -2251,7 +2263,7 @@ void GDALRegister_PCIDSK()
     poDriver->SetMetadataItem( GDAL_DCAP_RASTER, "YES" );
     poDriver->SetMetadataItem( GDAL_DCAP_VECTOR, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_LONGNAME, "PCIDSK Database File" );
-    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "frmt_pcidsk.html" );
+    poDriver->SetMetadataItem( GDAL_DMD_HELPTOPIC, "drivers/raster/pcidsk.html" );
     poDriver->SetMetadataItem( GDAL_DCAP_VIRTUALIO, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_EXTENSION, "pix" );
     poDriver->SetMetadataItem( GDAL_DMD_CREATIONDATATYPES,

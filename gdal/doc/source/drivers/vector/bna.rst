@@ -6,6 +6,8 @@ BNA - Atlas BNA
 
 .. shortname:: BNA
 
+.. built_in_by_default::
+
 The BNA format is an ASCII exchange format for 2D vector data supported by many
 software packages. It only contains geometry and a few identifiers per record.
 Attributes must be stored into external files. It does not support any
@@ -91,10 +93,6 @@ The BNA writer supports the following creation options (dataset options):
 
 VSI Virtual File System API support
 -----------------------------------
-
-.. versionadded:: 1.9.0
-
-    Some features below might require OGR >= 1.9.0
 
 The driver supports reading and writing to files managed by VSI Virtual
 File System API, which include "regular" files, as well as files in the

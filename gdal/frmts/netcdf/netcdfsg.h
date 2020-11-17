@@ -90,8 +90,8 @@ namespace nccfdriver
         std::vector<int> node_counts;    // node counts of each geometry in a container
         std::vector<int> pnode_counts;    // part node counts of each geometry in a container
         std::vector<bool> int_rings;    // list of parts that are interior rings
-        std::vector<size_t> bound_list;    // a quick list used to store the real beginning indicies of shapes
-        std::vector<size_t> pnc_bl;    // a quick list of indicies for part counts corresponding to a geometry
+        std::vector<size_t> bound_list;    // a quick list used to store the real beginning indices of shapes
+        std::vector<size_t> pnc_bl;    // a quick list of indices for part counts corresponding to a geometry
         std::vector<int> parts_count;    // a count of total parts in a single geometry instance
         std::vector<int> poly_count;    // count of polygons, for use only when interior rings are present
         std::unique_ptr<Point> pt_buffer;    // holds the current point
@@ -151,11 +151,10 @@ namespace nccfdriver
          */
         int getContainerId() { return gc_varId; }
 
-        /* void unsigned char * serializeToWKB
+        /* std::vector<unsigned char> serializeToWKB
          * Returns a pre-allocated array which serves as the WKB reference to this geometry
-         * the size of the WKB representation is written to the passed in wkbSize
          */
-        unsigned char * serializeToWKB(size_t featureInd, int& wkbSize);
+        std::vector<unsigned char> serializeToWKB(size_t featureInd);
 
         /* Return a point at a specific index specifically
          * this point should NOT be explicitly freed.
@@ -187,7 +186,7 @@ namespace nccfdriver
         std::vector<std::string> v_headers;
         int nc;
         
-        void open(int container_id);    // opens and intializes a geometry_container into the scanner 
+        void open(int container_id);    // opens and initializes a geometry_container into the scanner 
         
         public:
             std::vector<std::string>& headers() { return this->v_headers; }
@@ -342,10 +341,10 @@ namespace nccfdriver
      */
     geom_t getGeometryType(int ncid, int varid); 
     
-    void* inPlaceSerialize_Point(SGeometry_Reader * ge, size_t seek_pos, void * serializeBegin);
-    void* inPlaceSerialize_LineString(SGeometry_Reader * ge, int node_count, size_t seek_begin, void * serializeBegin);
-    void* inPlaceSerialize_PolygonExtOnly(SGeometry_Reader * ge, int node_count, size_t seek_begin, void * serializeBegin);
-    void* inPlaceSerialize_Polygon(SGeometry_Reader * ge, std::vector<int>& pnc, int ring_count, size_t seek_begin, void * serializeBegin);
+    void inPlaceSerialize_Point(SGeometry_Reader * ge, size_t seek_pos, std::vector<unsigned char>& buffer);
+    void inPlaceSerialize_LineString(SGeometry_Reader * ge, int node_count, size_t seek_begin, std::vector<unsigned char>& buffer);
+    void inPlaceSerialize_PolygonExtOnly(SGeometry_Reader * ge, int node_count, size_t seek_begin, std::vector<unsigned char>& buffer);
+    void inPlaceSerialize_Polygon(SGeometry_Reader * ge, std::vector<int>& pnc, int ring_count, size_t seek_begin, std::vector<unsigned char>& buffer);
 
     /* scanForGeometryContainers
      * A simple function that scans a netCDF File for Geometry Containers

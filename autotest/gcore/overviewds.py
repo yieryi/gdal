@@ -29,9 +29,10 @@
 # DEALINGS IN THE SOFTWARE.
 ###############################################################################
 
+import gdaltest
 import os
 import shutil
-
+import struct
 
 from osgeo import gdal
 import pytest
@@ -41,8 +42,6 @@ import pytest
 
 
 def test_overviewds_1():
-    ds = gdal.OpenEx('data/byte.tif', open_options=['OVERVIEW_LEVEL=-1'])
-    assert ds is None
     ds = gdal.OpenEx('data/byte.tif', open_options=['OVERVIEW_LEVEL=0'])
     assert ds is None
 
@@ -55,13 +54,27 @@ def test_overviewds_2():
     shutil.copy('data/byte.tif', 'tmp')
     ds = gdal.Open('tmp/byte.tif')
     ds.BuildOverviews('NEAR', overviewlist=[2, 4])
-    ds = None
-
-    ds = gdal.OpenEx('tmp/byte.tif', open_options=['OVERVIEW_LEVEL=0only'])
-    assert ds.GetRasterBand(1).GetOverviewCount() == 0
+    ds.GetRasterBand(1).WriteRaster(2, 2, 5, 5, b'\0' * 25)
+    ds.GetRasterBand(1).WriteRaster(2, 2, 1, 1, b'\0')
     ds = None
 
     src_ds = gdal.Open('tmp/byte.tif')
+
+    ds = gdal.OpenEx('data/byte.tif', open_options=['OVERVIEW_LEVEL=NONE'])
+    assert ds.RasterXSize == 20 and ds.RasterYSize == 20 and ds.RasterCount == 1
+    assert ds.GetRasterBand(1).GetOverviewCount() == 0
+    assert ds.GetProjectionRef() == src_ds.GetProjectionRef()
+    assert ds.GetGeoTransform() == src_ds.GetGeoTransform()
+    assert ds.ReadRaster() == src_ds.ReadRaster()
+    # Check that subsampled request doesn't use source overviews
+    assert ds.ReadRaster(0, 0, 20, 20, 10, 10) != src_ds.GetRasterBand(1).GetOverview(0).ReadRaster()
+    ds = None
+
+    ds = gdal.OpenEx('tmp/byte.tif', open_options=['OVERVIEW_LEVEL=0only'])
+    assert ds.RasterXSize == 10 and ds.RasterYSize == 10 and ds.RasterCount == 1
+    assert ds.GetRasterBand(1).GetOverviewCount() == 0
+    ds = None
+
     ds = gdal.OpenEx('tmp/byte.tif', open_options=['OVERVIEW_LEVEL=0'])
     assert ds is not None
     assert ds.RasterXSize == 10 and ds.RasterYSize == 10 and ds.RasterCount == 1
@@ -72,15 +85,19 @@ def test_overviewds_2():
     for i in range(6):
         assert expected_gt[i] == pytest.approx(gt[i], abs=1e-5)
     assert ds.GetGCPCount() == 0 and ds.GetGCPProjection() == src_ds.GetGCPProjection() and not ds.GetGCPs()
-    expected_data = src_ds.ReadRaster(0, 0, 20, 20, 10, 10)
-    got_data = ds.ReadRaster(0, 0, 10, 10)
+    expected_data = src_ds.GetRasterBand(1).GetOverview(0).ReadRaster()
+    got_data = ds.ReadRaster()
     assert expected_data == got_data
-    got_data = ds.GetRasterBand(1).ReadRaster(0, 0, 10, 10)
+    got_data = ds.GetRasterBand(1).ReadRaster()
     assert expected_data == got_data
     assert ds.GetRasterBand(1).GetOverviewCount() == 1
-    expected_data = src_ds.ReadRaster(0, 0, 20, 20, 5, 5)
-    got_data = ds.GetRasterBand(1).GetOverview(0).ReadRaster(0, 0, 5, 5)
+    expected_data = src_ds.GetRasterBand(1).GetOverview(1).ReadRaster()
+    got_data = ds.GetRasterBand(1).GetOverview(0).ReadRaster()
     assert expected_data == got_data
+    got_data = ds.ReadRaster(0, 0, 10, 10, 5, 5)
+    assert expected_data == got_data
+    assert ds.GetRasterBand(1).GetMaskFlags() == gdal.GMF_ALL_VALID
+    assert ds.GetRasterBand(1).GetMaskBand()
     assert ds.GetMetadata() == src_ds.GetMetadata()
     assert ds.GetMetadataItem('AREA_OR_POINT') == src_ds.GetMetadataItem('AREA_OR_POINT')
     assert not ds.GetMetadata('RPC')
@@ -249,6 +266,37 @@ def test_overviewds_6():
     got_cs = ds.GetRasterBand(1).Checksum()
     assert got_cs == expected_cs
     ds = None
+
+###############################################################################
+# Dataset with a mask
+
+def test_overviewds_mask():
+
+    with gdaltest.config_option('GDAL_TIFF_INTERNAL_MASK', 'YES'):
+        src_ds = gdal.GetDriverByName('GTiff').Create('/vsimem/test.tif', 4, 4)
+        src_ds.CreateMaskBand(gdal.GMF_PER_DATASET)
+        src_ds.GetRasterBand(1).GetMaskBand().WriteRaster(0, 0, 2, 4, b'\xFF' * 8)
+        src_ds.BuildOverviews('NEAR', [2, 4])
+        src_ds = None
+
+    ovr_ds = gdal.OpenEx('/vsimem/test.tif', open_options=['OVERVIEW_LEVEL=0'])
+    assert ovr_ds
+    assert ovr_ds.GetRasterBand(1).GetMaskFlags() == gdal.GMF_PER_DATASET
+    ovrmaskband = ovr_ds.GetRasterBand(1).GetMaskBand()
+    assert struct.unpack('B' * 4, ovrmaskband.ReadRaster()) == (255, 0, 255, 0)
+
+    # Mask of mask
+    assert ovrmaskband.GetMaskFlags() == gdal.GMF_ALL_VALID
+    assert struct.unpack('B' * 4, ovrmaskband.GetMaskBand().ReadRaster()) == (255, 255, 255, 255)
+
+    # Overview of overview of mask
+    assert ovrmaskband.GetOverviewCount() == 1
+    ovrofovrmaskband = ovrmaskband.GetOverview(0)
+    assert struct.unpack('B' * 1, ovrofovrmaskband.ReadRaster()) == (255,)
+
+    ovr_ds = None
+
+    gdal.GetDriverByName('GTiff').Delete('/vsimem/test.tif')
 
 ###############################################################################
 # Cleanup

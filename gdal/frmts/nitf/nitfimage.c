@@ -2298,7 +2298,7 @@ static int NITFFormatRPC00BCoefficient( char* pszBuffer, double dfVal,
     // with 3 digits + 1 terminating byte
     char szTemp[12+2+1];
 #if defined(DEBUG) || defined(WIN32)
-    size_t nLen;
+    int nLen;
 #endif
 
     if( fabs(dfVal) > 9.999999e9 )
@@ -2310,7 +2310,8 @@ static int NITFFormatRPC00BCoefficient( char* pszBuffer, double dfVal,
 
     CPLsnprintf( szTemp, sizeof(szTemp), "%+.6E", dfVal);
 #if defined(DEBUG) || defined(WIN32)
-    nLen = strlen(szTemp);
+    nLen = (int)strlen(szTemp);
+    CPL_IGNORE_RET_VAL_INT(nLen);
 #endif
     CPLAssert( szTemp[9] == 'E' );
 #ifdef WIN32
@@ -2325,7 +2326,7 @@ static int NITFFormatRPC00BCoefficient( char* pszBuffer, double dfVal,
         }
         szTemp[11] = szTemp[13];
     }
-    else // behaviour of the standard: 2 digits for the exponent
+    else // behavior of the standard: 2 digits for the exponent
 #endif
     {
         CPLAssert( nLen == 13 );
@@ -3701,7 +3702,7 @@ static void NITFLoadLocationTable( NITFImage *psImage )
         }
     }
 
-    if( nHeaderOffset != 0 )
+    if( nHeaderOffset > 11 )
     {
         char achHeaderChunk[1000];
 
@@ -3874,7 +3875,7 @@ static int NITFLoadVQTables( NITFImage *psImage, int bTryGuessingOffset )
         bOK &= VSIFReadL( &nVQVector, 1, 4, psImage->psFile->fp ) == 4;
         nVQVector = CPL_MSBWORD32( nVQVector );
 
-        bOK &= VSIFSeekL( psImage->psFile->fp, nVQOffset + nVQVector, SEEK_SET ) == 0;
+        bOK &= VSIFSeekL( psImage->psFile->fp, (vsi_l_offset)(nVQOffset) + nVQVector, SEEK_SET ) == 0;
         bOK &= VSIFReadL( psImage->apanVQLUT[i], 4, 4096, psImage->psFile->fp ) == 4096;
         if( !bOK )
         {

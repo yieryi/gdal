@@ -340,6 +340,10 @@ public:
     return OSRIsGeographic(self);
   }
 
+  int IsDerivedGeographic() {
+    return OSRIsDerivedGeographic(self);
+  }
+
   int IsProjected() {
     return OSRIsProjected(self);
   }
@@ -885,6 +889,17 @@ public:
     return OSRSetVDG( self, clong, fe, fn );
   }
 
+%feature( "kwargs" ) SetVerticalPerspective;
+  OGRErr SetVerticalPerspective( double topoOriginLat,
+                                 double topoOriginLon,
+                                 double topoOriginHeight,
+                                 double viewPointHeight,
+                                 double fe, double fn )
+  {
+    return OSRSetVerticalPerspective( self,
+        topoOriginLat, topoOriginLon, topoOriginHeight, viewPointHeight, fe, fn );
+  }
+
   OGRErr SetWellKnownGeogCS( const char *name ) {
     return OSRSetWellKnownGeogCS( self, name );
   }
@@ -909,8 +924,17 @@ public:
     return OSRSetTOWGS84( self, p1, p2, p3, p4, p5, p6, p7 );
   }
 
+  bool HasTOWGS84() {
+    double ignored[7];
+    return OSRGetTOWGS84( self, ignored, 7 ) == OGRERR_NONE;
+  }
+
   OGRErr GetTOWGS84( double argout[7] ) {
     return OSRGetTOWGS84( self, argout, 7 );
+  }
+
+  OGRErr AddGuessedTOWGS84() {
+    return OSRAddGuessedTOWGS84( self );
   }
 
   OGRErr SetLocalCS( const char *pszName ) {
@@ -1080,6 +1104,16 @@ public:
     return OSRConvertToOtherProjection(self, other_projection, options);
   }
 
+%clear const char* name;
+  OGRErr PromoteTo3D( const char* name = NULL ) {
+    return OSRPromoteTo3D(self, name);
+  }
+
+  OGRErr DemoteTo2D( const char* name = NULL ) {
+    return OSRDemoteTo2D(self, name);
+  }
+%apply Pointer NONNULL {const char* name};
+
 } /* %extend */
 };
 
@@ -1229,7 +1263,7 @@ public:
 /*                   GetCRSInfoListFromDatabase()                       */
 /************************************************************************/
 
-#ifdef SWIGPYTHON
+#if defined(SWIGPYTHON) || defined(SWIGCSHARP)
 
 %rename (CRSType) OSRCRSType;
 typedef enum OSRCRSType
@@ -1375,6 +1409,9 @@ const char* OSRCRSInfo_projection_method_get( OSRCRSInfo *crsInfo ) {
 
 %}
 
+#endif
+
+#ifdef SWIGPYTHON
 %inline %{
 void GetCRSInfoListFromDatabase( const char *authName,
                                  OSRCRSInfo*** pList,
@@ -1403,6 +1440,15 @@ void SetPROJSearchPaths( char** paths )
 %}
 %clear (char **);
 
+%apply (char **CSL) {(char **)};
+%inline %{
+char** GetPROJSearchPaths()
+{
+    return OSRGetPROJSearchPaths();
+}
+%}
+%clear (char **);
+
 %inline %{
 int GetPROJVersionMajor()
 {
@@ -1415,6 +1461,13 @@ int GetPROJVersionMinor()
 {
     int num;
     OSRGetPROJVersion(NULL, &num, NULL);
+    return num;
+}
+
+int GetPROJVersionMicro()
+{
+    int num;
+    OSRGetPROJVersion(NULL, NULL, &num);
     return num;
 }
 %}

@@ -32,6 +32,8 @@
 #include "gdal_utils_priv.h"
 #include "commonutils.h"
 
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
@@ -87,6 +89,8 @@ struct GDALGridOptions
     char            **papszCreateOptions;
     int             nXSize;
     int             nYSize;
+    double          dfXRes;
+    double          dfYRes;
     double          dfXMin;
     double          dfXMax;
     double          dfYMin;
@@ -712,7 +716,7 @@ static OGRGeometryCollection* LoadGeometry( const char* pszDS,
 /**
  * Create raster from the scattered data.
  *
- * This is the equivalent of the <a href="gdal_grid.html">gdal_grid</a> utility.
+ * This is the equivalent of the <a href="/programs/gdal_grid.html">gdal_grid</a> utility.
  *
  * GDALGridOptions* must be allocated and freed with GDALGridOptionsNew()
  * and GDALGridOptionsFree() respectively.
@@ -720,7 +724,7 @@ static OGRGeometryCollection* LoadGeometry( const char* pszDS,
  * @param pszDest the destination dataset path.
  * @param hSrcDataset the source dataset handle.
  * @param psOptionsIn the options struct returned by GDALGridOptionsNew() or NULL.
- * @param pbUsageError the pointer to int variable to determine any usage error has occurred or NULL.
+ * @param pbUsageError pointer to a integer output variable to store if any usage error has occurred or NULL.
  * @return the output dataset (new dataset that must be closed using GDALClose()) or NULL in case of error.
  *
  * @since GDAL 2.1
@@ -764,6 +768,12 @@ GDALDatasetH GDALGrid( const char *pszDest, GDALDatasetH hSrcDataset,
                  "Neither -sql nor -l are specified, but the source dataset has not one single layer.");
         if( pbUsageError )
             *pbUsageError = TRUE;
+        GDALGridOptionsFree(psOptionsToFree);
+        return nullptr;
+    }
+
+    if ( (psOptions->nXSize != 0 || psOptions->nYSize != 0) && (psOptions->dfXRes != 0 || psOptions->dfYRes != 0) ) {
+        CPLError(CE_Failure, CPLE_IllegalArg, "-outsize and -tr options cannot be used at the same time.");
         GDALGridOptionsFree(psOptionsToFree);
         return nullptr;
     }
@@ -823,13 +833,45 @@ GDALDatasetH GDALGrid( const char *pszDest, GDALDatasetH hSrcDataset,
     if ( psOptions->pszSQL )
         nBands++;
 
-    // FIXME
-    int nXSize = psOptions->nXSize;
-    if ( nXSize == 0 )
-        nXSize = 256;
-    int nYSize = psOptions->nYSize;
-    if ( nYSize == 0 )
-        nYSize = 256;
+    int nXSize;
+    int nYSize;
+    if ( psOptions->dfXRes != 0 && psOptions->dfYRes != 0 )
+    {
+        if ((psOptions->dfXMax == psOptions->dfXMin) || (psOptions->dfYMax == psOptions->dfYMin)) {
+            CPLError( CE_Failure, CPLE_IllegalArg,
+                    "Invalid txe or tye parameters detected. Please check your -txe or -tye argument.");
+
+            if(pbUsageError)
+                *pbUsageError = TRUE;
+            return nullptr;
+        }
+
+        double dfXSize = (std::fabs(psOptions->dfXMax - psOptions->dfXMin) + (psOptions->dfXRes/2.0)) /
+            psOptions->dfXRes;
+        double dfYSize = (std::fabs(psOptions->dfYMax - psOptions->dfYMin) + (psOptions->dfYRes/2.0)) /
+            psOptions->dfYRes;
+
+        if (dfXSize >= 1 && dfXSize <= INT_MAX && dfYSize >= 1 && dfYSize <= INT_MAX) {
+            nXSize = static_cast<int>(dfXSize);
+            nYSize = static_cast<int>(dfYSize);
+        } else {
+            CPLError( CE_Failure, CPLE_IllegalArg, "Invalid output size detected. Please check your -tr argument");
+
+            if(pbUsageError)
+                *pbUsageError = TRUE;
+            return nullptr;
+        }
+    }
+    else
+    {
+        // FIXME
+        nXSize = psOptions->nXSize;
+        if ( nXSize == 0 )
+            nXSize = 256;
+        nYSize = psOptions->nYSize;
+        if ( nYSize == 0 )
+            nYSize = 256;
+    }
 
     GDALDatasetH hDstDS =
         GDALCreate(hDriver, pszDest, nXSize, nYSize, nBands,
@@ -983,7 +1025,7 @@ static bool IsNumber(const char* pszStr)
  * Allocates a GDALGridOptions struct.
  *
  * @param papszArgv NULL terminated list of options (potentially including filename and open options too), or NULL.
- *                  The accepted options are the ones of the <a href="gdal_translate.html">gdal_translate</a> utility.
+ *                  The accepted options are the ones of the <a href="/programs/gdal_translate.html">gdal_translate</a> utility.
  * @param psOptionsForBinary (output) may be NULL (and should generally be NULL),
  *                           otherwise (gdal_translate_bin.cpp use case) must be allocated with
  *                           GDALGridOptionsForBinaryNew() prior to this function. Will be
@@ -1012,6 +1054,8 @@ GDALGridOptions *GDALGridOptionsNew(char** papszArgv, GDALGridOptionsForBinary* 
     psOptions->papszCreateOptions = nullptr;
     psOptions->nXSize = 0;
     psOptions->nYSize = 0;
+    psOptions->dfXRes = 0;
+    psOptions->dfYRes = 0;
     psOptions->dfXMin = 0.0;
     psOptions->dfXMax = 0.0;
     psOptions->dfYMin = 0.0;
@@ -1039,7 +1083,7 @@ GDALGridOptions *GDALGridOptionsNew(char** papszArgv, GDALGridOptionsForBinary* 
 /*      Handle command line arguments.                                  */
 /* -------------------------------------------------------------------- */
     const int argc = CSLCount(papszArgv);
-    for( int i = 0; papszArgv != nullptr && i < argc; i++ )
+    for( int i = 0; i < argc && papszArgv != nullptr && papszArgv[i] != nullptr; i++ )
     {
         if( i < argc-1 && (EQUAL(papszArgv[i],"-of") || EQUAL(papszArgv[i],"-f")) )
         {
@@ -1092,8 +1136,23 @@ GDALGridOptions *GDALGridOptionsNew(char** papszArgv, GDALGridOptionsForBinary* 
 
         else if( i+2 < argc && EQUAL(papszArgv[i],"-outsize") )
         {
-            psOptions->nXSize = atoi(papszArgv[++i]);
-            psOptions->nYSize = atoi(papszArgv[++i]);
+            CPLAssert(papszArgv[i+1]);
+            CPLAssert(papszArgv[i+2]);
+            psOptions->nXSize = atoi(papszArgv[i+1]);
+            psOptions->nYSize = atoi(papszArgv[i+2]);
+            i += 2;
+        }
+
+        else if( i+2 < argc && EQUAL(papszArgv[i],"-tr") )
+        {
+            psOptions->dfXRes = CPLAtofM(papszArgv[++i]);
+            psOptions->dfYRes = CPLAtofM(papszArgv[++i]);
+            if( psOptions->dfXRes <= 0 || psOptions->dfYRes <= 0 )
+            {
+                CPLError(CE_Failure, CPLE_IllegalArg, "Wrong value for -tr parameters.");
+                GDALGridOptionsFree(psOptions);
+                return nullptr;
+            }
         }
 
         else if( i+1 < argc && EQUAL(papszArgv[i],"-co") )

@@ -34,8 +34,6 @@ import sys
 from osgeo import gdal
 import pytest
 
-sys.path.append('../../gdal/swig/python/samples')
-
 import gdaltest
 
 ###############################################################################
@@ -48,6 +46,11 @@ def test_validate_jp2_1():
     gdaltest.jp2openjpeg_drv = gdal.GetDriverByName('JP2OpenJPEG')
     if gdaltest.jp2openjpeg_drv is None:
         pytest.skip()
+
+
+    path = '../../gdal/swig/python/samples'
+    if path not in sys.path:
+        sys.path.append(path)
 
     try:
         import validate_jp2
@@ -78,6 +81,10 @@ def validate(filename, inspire_tg=True, expected_gmljp2=True, oidoc=None):
         except (ImportError, AttributeError):
             ogc_schemas_location = 'disabled'
 
+    path = '../../gdal/swig/python/samples'
+    if path not in sys.path:
+        sys.path.append(path)
+
     import validate_jp2
     error_report = validate_jp2.ErrorReport(collect_internally=True)
     return validate_jp2.validate(filename, oidoc, inspire_tg, expected_gmljp2, ogc_schemas_location, error_report=error_report)
@@ -105,7 +112,7 @@ def test_validate_jp2_2():
                        'ERROR[GENERAL]: ftyp.BR = "XXXX" instead of "jp2 "',
                        'ERROR[GENERAL]: ftyp.MinV = "1" instead of 0',
                        'ERROR[INSPIRE_TG]: "jpx " not found in compatibility list of ftyp, but GMLJP2 box present',
-                       'ERROR[INSPIRE_TG]: "rreq" box does not advertize standard flag 67 whereas GMLJP2 box is present',
+                       'ERROR[INSPIRE_TG]: "rreq" box does not advertise standard flag 67 whereas GMLJP2 box is present',
                        'ERROR[GENERAL]: ihdr.C = 6 instead of 7',
                        'ERROR[GENERAL]: ihdr.UnkC = 2 instead of 0 or 1',
                        'ERROR[GENERAL]: "ihdr" box expected to be found zero or one time, but present 2 times',
@@ -125,7 +132,7 @@ def test_validate_jp2_2():
                        'ERROR[INSPIRE_TG, Conformance class A.8.6]: count(OrthoImageryCoverage.rangeType.field)(=1) != Csiz(=2) ',
                        'ERROR[PROFILE_1, Conformance class A.8.14]: SPcod_xcb_minus_2 = 5, whereas max allowed for Profile 1 is 4']
 
-    if error_report.error_array != expected_errors:
+    if set(error_report.error_array) != set(expected_errors):
         import pprint
         pp = pprint.PrettyPrinter()
         pp.pprint(error_report.error_array)
@@ -140,7 +147,7 @@ def test_validate_jp2_2():
         'WARNING[INSPIRE_TG]: "uuid" box not at expected index',
         'WARNING[INSPIRE_TG, Recommendation 39]: No user-defined precincts 0 defined'
     ]
-    if error_report.warning_array != expected_warnings:
+    if set(error_report.warning_array) != set(expected_warnings):
         import pprint
         pp = pprint.PrettyPrinter()
         pp.pprint(error_report.warning_array)

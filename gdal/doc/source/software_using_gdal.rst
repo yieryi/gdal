@@ -38,10 +38,11 @@ Software using GDAL
 - `GeoView Pro  <http://www.geoviewpro.com>`_  IOS mobile mapping application.
 - `Geoweb3d  <http://www.geoweb3d.com>`_  A 3D virtual globe that provides on-the-fly, game-quality visualization of GIS data.
 - `GMT (Generic Mapping Tools)  <http://gmt.soest.hawaii.edu>`_  an open source collection of tools for processing and displaying xy and xyz datasets.
-- `Geoogle Earth  <http://earth.google.com>`_  A 3D world viewer.
+- `Google Earth  <http://earth.google.com>`_  A 3D world viewer.
 - `GPSeismic  <http://www.gpseismic.com>`_  A suite of applications for seismic survey.
 - `GRASS GIS  <http://grass.osgeo.org>`_  A raster/vector open source GIS that uses GDAL for raster/vector import and export (via r.in.gdal/r.out.gdal)
 - `gstat  <http://www.gstat.org>`_  a geostatistical modelling package.
+- `GuidosToolbox  <https://forest.jrc.ec.europa.eu/en/activities/lpa/gtb/>`_  A multi-platform desktop application for generic image object analysis.
 - `gvSIG  <http://www.gvsig.com>`_  Desktop GIS Client.
 - `HydroDaVE Explorer  <http://www.hydrodave.com>`_  A web-enabled client that provides users an easy to use, secure, and reliable data management platform to efficienctly manage, access, and analyze environmental data.
 - `IDRISI  <http://www.idrisi.com>`_  A GIS and Image Processing Windows Desktop application. Uses GDAL to import/export/warp raster data.
@@ -96,7 +97,7 @@ Software using GDAL
 - `SkylineGlobe  <http://www.skylineglobe.com>`_  The Skyline suite of interactive applications allows you to build, view, query and analyze customized, virtual 3D landscapes.
 - `SNAP  <http://step.esa.int/main/toolboxes/snap>`_  Sentinel Application Platform for Earth Observation processing and analysis.
 - `SpacEyes3D  <http://www.spaceyes.com>`_  3D visualization software for cartographic data.
-- `Spatial Manger  <http://www.spatialmanager.com>`_  A product suite designed designed to manage spatial data in a simple, fast and inexpensive way. Uses GDAL to import/export data.
+- `Spatial Manager  <http://www.spatialmanager.com>`_  A product suite designed designed to manage spatial data in a simple, fast and inexpensive way. Uses GDAL to import/export data.
 - `Carmenta Engine  <http://www.carmenta.com>`_ (previously known as SpatialAce): A GIS Rapid Application Development environment
 - `StarSpan  <https://github.com/Ecotrust/starspan>`_  raster/vector analysis.
 - `TacitView  <https://www.insitu.com/information-delivery/information-processing/tacitview>`_  An imagery visualization and exploitation package for military intelligence.

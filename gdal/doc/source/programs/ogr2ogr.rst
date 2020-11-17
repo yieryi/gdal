@@ -38,6 +38,7 @@ Synopsis
             [-clipdstwhere expression]
             [-wrapdateline] [-datelineoffset val]
             [[-simplify tolerance] | [-segmentize max_dist]]
+            [-makevalid]
             [-addfields] [-unsetFid]
             [-relaxedFieldNameMatch] [-forceNullable] [-unsetDefault]
             [-fieldTypeToString All|(type1[,type2]*)] [-unsetFieldWidth]
@@ -165,6 +166,9 @@ output coordinate system or even reprojecting the features during translation.
     with ``-nlt POLYGON``, the resulting polygon will break the Simple Features
     rules.
 
+    Starting with GDAL 3.0.5, ``-nlt CONVERT_TO_LINEAR`` and ``-nlt PROMOTE_TO_MULTI``
+    can be used simultaneously.
+
 .. option:: -dim <val>
 
     Force the coordinate dimension to val (valid values are ``XY``, ``XYZ``,
@@ -201,11 +205,11 @@ output coordinate system or even reprojecting the features during translation.
 .. option:: -preserve_fid
 
     Use the FID of the source features instead of letting the output driver
-    automatically assign a new one (for formats that require an FID).  If not
-    in append mode, this behaviour is the default if the output driver has
-    a FID layer creation option, un which case the name of the source FID
+    automatically assign a new one (for formats that require a FID). If not
+    in append mode, this behavior is the default if the output driver has
+    a FID layer creation option, in which case the name of the source FID
     column will be used and source feature IDs will be attempted to be
-    preserved. This behaviour can be disabled by setting ``-unsetFid``.
+    preserved. This behavior can be disabled by setting ``-unsetFid``.
 
 .. option:: -fid fid
 
@@ -229,7 +233,7 @@ output coordinate system or even reprojecting the features during translation.
 
 .. option:: -gt n
 
-    Group n features per transaction (default 20000). Increase the value for
+    Group n features per transaction (default 100 000). Increase the value for
     better performance when writing into DBMS drivers that have transaction
     support. ``n`` can be set to unlimited to load the data into a single
     transaction.
@@ -298,6 +302,14 @@ output coordinate system or even reprojecting the features during translation.
 
     Maximum distance between 2 nodes. Used to create intermediate points.
 
+.. option:: -makevalid
+
+    Run the :cpp:func:`OGRGeometry::MakeValid` operation, followed by
+    :cpp:func:`OGRGeometryFactory::removeLowerDimensionSubGeoms`, on geometries 
+    to ensure they are valid regarding the rules of the Simple Features specification.
+
+    .. versionadded: 3.1 (requires GEOS 3.8 or later)
+
 .. option:: -fieldTypeToString type1,...
 
     Converts any field of the specified type to a field of type string in the
@@ -337,7 +349,7 @@ output coordinate system or even reprojecting the features during translation.
 .. option:: -explodecollections
 
     Produce one feature for each geometry in any kind of geometry collection in
-    the source file
+    the source file, applied after any ``-sql`` option.
 
 .. option:: -zfield <field_name>
 
@@ -395,7 +407,7 @@ output coordinate system or even reprojecting the features during translation.
 
 .. option:: -unsetFid
 
-    Can be specify to prevent the name of the source FID column and source
+    Can be specified to prevent the name of the source FID column and source
     feature IDs from being re-used for the target layer. This option can for
     example be useful if selecting source features with a ORDER BY clause.
 
@@ -444,11 +456,49 @@ This utility is also callable from C with :cpp:func:`GDALVectorTranslate`.
 Examples
 --------
 
+Basic conversion from Shapefile to GeoPackage:
+
+.. code-block::
+
+  ogr2ogr \
+    -f GPKG output.gpkg \
+    input.shp
+
+Change the coordinate reference system from ``EPSG:4326`` to ``EPSG:3857``:
+
+.. code-block::
+
+  ogr2ogr \
+    -s_srs EPSG:4326 \
+    -t_srs EPSG:3857 \
+    -f GPKG output.gpkg \
+    input.gpkg
+
 Example appending to an existing layer (both ``-update`` and ``-append`` flags need to be used):
 
 .. code-block::
 
     ogr2ogr -update -append -f PostgreSQL PG:dbname=warmerda abc.tab
+
+Clip input layer with a bounding box (<xmin> <ymin> <xmax> <ymax>):
+
+.. code-block::
+
+  ogr2ogr \
+    -spat -13.931 34.886 46.23 74.12 \
+    -f GPKG output.gpkg \
+    natural_earth_vector.gpkg
+
+Filter Features by a ``-where`` clause:
+
+.. code-block::
+
+  ogr2ogr \
+    -where "\"POP_EST\" < 1000000" \
+    -f GPKG output.gpkg \
+    natural_earth_vector.gpkg \
+    ne_10m_admin_0_countries
+
 
 Example reprojecting from ETRS_1989_LAEA_52N_10E to EPSG:4326 and clipping to a bounding box:
 
